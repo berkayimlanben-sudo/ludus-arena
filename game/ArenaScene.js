@@ -7,11 +7,16 @@
 
             this.camera = new Engine.Camera2D('ArenaCam', 480, 240);
             this.particles = new Game.ParticleSystem();
+
+            this.leftTeam = [];
+            this.rightTeam = [];
+            this.allFighters = [];
             this.leftFighter = null;
             this.rightFighter = null;
 
             this.matchEnded = false;
             this.winner = null;
+            this.winningTeam = null;
             this.matchTime = 0;
 
             this.tacticCooldowns = { AGGRESSIVE: 0, DEFENSIVE: 0, MORALE: 0 };
@@ -27,50 +32,88 @@
             this.addChild(this.camera);
             this.tree.activeCamera = this.camera;
 
-            const leftCfg = Object.assign({
-                x: 260, y: 355, team: 'left', teamColor: '#c83e37',
-                weapon: Data.WEAPONS.sword, shield: Data.SHIELDS.scutum,
-                armor: Data.ARMORS.leather, helmet: Data.HELMETS.galea
-            }, this.leftConfig);
+            const leftList = Array.isArray(this.leftConfig) ? this.leftConfig : [this.leftConfig];
+            const rightList = Array.isArray(this.rightConfig) ? this.rightConfig : [this.rightConfig];
 
-            const rightCfg = Object.assign({
-                x: 700, y: 355, team: 'right', teamColor: '#2c6eb5',
-                weapon: Data.WEAPONS.spear, shield: Data.SHIELDS.none,
-                armor: Data.ARMORS.tunic, helmet: Data.HELMETS.corinthian
-            }, this.rightConfig);
-
-            this.leftFighter = new Game.Gladiator(leftCfg);
-            this.rightFighter = new Game.Gladiator(rightCfg);
-
-            this.leftFighter.opponent = this.rightFighter;
-            this.rightFighter.opponent = this.leftFighter;
-            this.leftFighter.particles = this.particles;
-            this.rightFighter.particles = this.particles;
-
-            this.leftFighter.onLog.connect((msg) => {
-                this.crowdExcitement = Math.min(1, this.crowdExcitement + 0.35);
-                this.onBattleLog.emit(msg);
-            });
-            this.rightFighter.onLog.connect((msg) => {
-                this.crowdExcitement = Math.min(1, this.crowdExcitement + 0.35);
-                this.onBattleLog.emit(msg);
+            leftList.forEach((cfg, idx) => {
+                const full = Object.assign({
+                    x: 270 - idx * 75, y: 355, team: 'left',
+                    teamColor: idx === 0 ? '#c83e37' : '#8f241f',
+                    weapon: Data.WEAPONS.sword, shield: Data.SHIELDS.scutum,
+                    armor: Data.ARMORS.leather, helmet: Data.HELMETS.galea
+                }, cfg);
+                const f = new Game.Gladiator(full);
+                f.particles = this.particles;
+                this.leftTeam.push(f);
+                this.allFighters.push(f);
             });
 
-            this.leftFighter.onDied.connect((_, killer) => this._endMatch(killer));
-            this.rightFighter.onDied.connect((_, killer) => this._endMatch(killer));
+            rightList.forEach((cfg, idx) => {
+                const full = Object.assign({
+                    x: 690 + idx * 75, y: 355, team: 'right',
+                    teamColor: idx === 0 ? '#2c6eb5' : '#1b497a',
+                    weapon: Data.WEAPONS.spear, shield: Data.SHIELDS.none,
+                    armor: Data.ARMORS.tunic, helmet: Data.HELMETS.corinthian
+                }, cfg);
+                const f = new Game.Gladiator(full);
+                f.particles = this.particles;
+                this.rightTeam.push(f);
+                this.allFighters.push(f);
+            });
 
-            this.addChild(this.leftFighter);
-            this.addChild(this.rightFighter);
+            this.leftFighter = this.leftTeam[0];
+            this.rightFighter = this.rightTeam[0];
+
+            this.leftTeam.forEach(f => {
+                f.enemies = this.rightTeam;
+                f.allies = this.leftTeam.filter(a => a !== f);
+                f.allFighters = this.allFighters;
+                f.onLog.connect((msg) => {
+                    this.crowdExcitement = Math.min(1, this.crowdExcitement + 0.35);
+                    this.onBattleLog.emit(msg);
+                });
+                f.onDied.connect(() => this._checkMatchEnd());
+                this.addChild(f);
+            });
+
+            this.rightTeam.forEach(f => {
+                f.enemies = this.leftTeam;
+                f.allies = this.rightTeam.filter(a => a !== f);
+                f.allFighters = this.allFighters;
+                f.onLog.connect((msg) => {
+                    this.crowdExcitement = Math.min(1, this.crowdExcitement + 0.35);
+                    this.onBattleLog.emit(msg);
+                });
+                f.onDied.connect(() => this._checkMatchEnd());
+                this.addChild(f);
+            });
+
             this.addChild(this.particles);
 
-            this.onBattleLog.emit(`🔔 DÜELLO BAŞLADI: ${this.leftFighter.gladiatorName} vs ${this.rightFighter.gladiatorName}!`);
+            const lNames = this.leftTeam.map(f => f.gladiatorName).join(' & ');
+            const rNames = this.rightTeam.map(f => f.gladiatorName).join(' & ');
+            this.onBattleLog.emit(`🔔 DÜELLO BAŞLADI: ${lNames} vs ${rNames}!`);
+        }
+
+        _checkMatchEnd() {
+            if (this.matchEnded) return;
+            const leftAlive = this.leftTeam.filter(f => f.hp > 0);
+            const rightAlive = this.rightTeam.filter(f => f.hp > 0);
+
+            if (rightAlive.length === 0) {
+                this._endMatch(leftAlive[0] || this.leftTeam[0], 'left');
+            } else if (leftAlive.length === 0) {
+                this._endMatch(rightAlive[0] || this.rightTeam[0], 'right');
+            }
         }
 
         issueTactic(type) {
-            if (this.matchEnded || !this.leftFighter || this.leftFighter.hp <= 0) return false;
+            if (this.matchEnded) return false;
+            const aliveLeft = this.leftTeam.filter(f => f.hp > 0);
+            if (aliveLeft.length === 0) return false;
             if (this.tacticCooldowns[type] > 0) return false;
 
-            this.leftFighter.applyTactic(type);
+            aliveLeft.forEach(f => f.applyTactic(type));
             if (type === 'MORALE') {
                 this.crowdExcitement = 1.0;
                 this.tacticCooldowns.MORALE = 13;
@@ -80,13 +123,14 @@
             return true;
         }
 
-        _endMatch(winner) {
+        _endMatch(winner, teamSide) {
             if (this.matchEnded) return;
             this.matchEnded = true;
             this.winner = winner;
+            this.winningTeam = teamSide;
             this.crowdExcitement = 1.0;
             if (Game.SoundFX) Game.SoundFX.playVictory();
-            this.onMatchFinished.emit(winner);
+            this.onMatchFinished.emit(winner, teamSide);
         }
 
         _process(delta) {
@@ -102,9 +146,14 @@
             this.crowdTime += delta * (3 + this.crowdExcitement * 10);
             this.crowdExcitement = Math.max(0, this.crowdExcitement - delta * 0.45);
 
-            if (this.leftFighter && this.rightFighter) {
-                const midX = (this.leftFighter.x + this.rightFighter.x) / 2;
-                const dist = Math.abs(this.leftFighter.x - this.rightFighter.x);
+            const active = this.allFighters.filter(f => f.hp > 0);
+            const tracked = active.length >= 2 ? active : this.allFighters;
+            if (tracked.length >= 2) {
+                const xs = tracked.map(f => f.x);
+                const minFighterX = Math.min(...xs);
+                const maxFighterX = Math.max(...xs);
+                const midX = (minFighterX + maxFighterX) / 2;
+                const dist = maxFighterX - minFighterX;
 
                 const targetZoom = dist < 170 ? 1.15 : (dist < 300 ? 1.07 : 1.0);
                 this.camera.targetZoom = targetZoom;

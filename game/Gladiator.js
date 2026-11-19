@@ -12,8 +12,19 @@
 
             this.trait = config.trait || null;
             this.injury = config.injury || null;
+            this.fatigue = config.fatigue || 0;
+            this.fightStyle = config.fightStyle || 'balanced';
+            this.perks = new Set(config.perks || []);
 
             const baseStats = Object.assign({ strength: 12, agility: 12, vitality: 12 }, config.stats || {});
+
+            const fatMult = this.fatigue >= 2 ? 0.60 : (this.fatigue === 1 ? 0.80 : 1.0);
+            if (fatMult < 1.0) {
+                baseStats.strength = Math.max(4, Math.round(baseStats.strength * fatMult));
+                baseStats.agility = Math.max(4, Math.round(baseStats.agility * fatMult));
+                baseStats.vitality = Math.max(4, Math.round(baseStats.vitality * fatMult));
+            }
+
             if (this.injury && baseStats[this.injury.stat] !== undefined) {
                 baseStats[this.injury.stat] = Math.max(4, baseStats[this.injury.stat] - this.injury.penalty);
             }
@@ -25,17 +36,23 @@
             this.helmet = config.helmet || Data.HELMETS.none;
 
             const tId = this.trait ? this.trait.id : '';
-            this.traitCritBonus = tId === 'fierce' ? 0.10 : 0;
+            this.traitCritBonus = (tId === 'fierce' ? 0.10 : 0) + (this.hasPerk('swift_foot') ? 0.08 : 0);
             this.traitDefMod = tId === 'iron_skin' ? 3 : (tId === 'fierce' ? -2 : 0);
-            this.traitSpeedMod = tId === 'nimble' ? 18 : 0;
+            this.traitSpeedMod = (tId === 'nimble' ? 18 : 0) + (this.hasPerk('swift_foot') ? 16 : 0);
             this.traitStamRegenMod = tId === 'nimble' ? 4 : 0;
             this.traitBlockBonus = tId === 'disciplined' ? 0.12 : 0;
             this.staminaCostMult = tId === 'disciplined' ? 0.85 : 1.0;
 
+            this.styleBlockMod = this.fightStyle === 'counter' ? 0.18 : (this.fightStyle === 'aggressive' ? -0.15 : (this.fightStyle === 'skirmisher' ? -0.05 : 0));
+            this.styleRetreatChance = this.fightStyle === 'counter' ? 0.55 : (this.fightStyle === 'skirmisher' ? 0.60 : (this.fightStyle === 'aggressive' ? 0.12 : 0.35));
+            this.styleCdMult = this.fightStyle === 'aggressive' ? 0.85 : (this.fightStyle === 'skirmisher' ? 0.95 : 1.0);
+            this.styleSpeedBonus = this.fightStyle === 'skirmisher' ? 14 : (this.fightStyle === 'aggressive' ? 8 : 0);
+
             this.totalWeight = (this.weapon.weight || 0) + (this.shield.weight || 0) +
                                (this.armor.weight || 0) + (this.helmet.weight || 0);
 
-            this.maxHp = 80 + this.stats.vitality * 6 + (this.armor.hpBonus || 0);
+            const perkHpBonus = this.hasPerk('iron_will') ? 20 : 0;
+            this.maxHp = 80 + this.stats.vitality * 6 + (this.armor.hpBonus || 0) + perkHpBonus;
             this.hp = (config.currentHp !== undefined)
                 ? Math.min(this.maxHp, Math.max(1, config.currentHp))
                 : this.maxHp;
@@ -46,16 +63,21 @@
             this.strength = this.stats.strength;
             this.agility = this.stats.agility;
             this.defense = Math.max(0, Math.round(this.stats.vitality * 0.35) + (this.armor.defense || 0) + (this.helmet.defense || 0) + this.traitDefMod);
-            this.moveSpeed = Math.max(60, 128 + this.agility * 4 - this.totalWeight * 2.4 + this.traitSpeedMod);
+            this.moveSpeed = Math.max(60, 128 + this.agility * 4 - this.totalWeight * 2.4 + this.traitSpeedMod + this.styleSpeedBonus);
 
+            this.enemies = [];
+            this.allies = [];
+            this.allFighters = [];
             this.opponent = null;
             this.particles = null;
             this.arenaBounds = { left: 80, right: 880, groundY: 355 };
 
             this.tacticOrder = null;
             this.tacticTimer = 0;
+            this.counterReady = false;
+            this.guaranteedCrit = false;
+            this.secondWindUsed = false;
 
-            // Aktif Buff/Debuff Durumları
             this.activeEffects = {
                 bleed: 0,
                 bleedTick: 0,
@@ -80,8 +102,41 @@
             this._setupStates();
         }
 
+        hasPerk(id) {
+            return this.perks.has(id);
+        }
+
         _ready() {
+            this.updateTarget();
             this.fsm.transitionTo('IDLE');
+        }
+
+        updateTarget() {
+            if (this.enemies && this.enemies.length > 0) {
+                const living = this.enemies.filter(e => e && e.hp > 0);
+                if (living.length === 0) {
+                    this.opponent = null;
+                    return;
+                }
+                let nearest = living[0];
+                let minDist = Math.abs(nearest.x - this.x);
+                for (let i = 1; i < living.length; i++) {
+                    const d = Math.abs(living[i].x - this.x);
+                    if (d < minDist) {
+                        minDist = d;
+                        nearest = living[i];
+                    }
+                }
+                this.opponent = nearest;
+            }
+        }
+
+        getEffectiveDefense() {
+            let d = this.defense - (this.activeEffects.armorBreak > 0 ? 5 : 0);
+            if (this.hasPerk('back_to_back') && this.allies.some(a => a && a.hp > 0 && Math.abs(a.x - this.x) <= 165)) {
+                d += 5;
+            }
+            return Math.max(0, d);
         }
 
         applyTactic(type) {
@@ -94,7 +149,7 @@
                     this.particles.spawnSparks(this.x, this.y, 1, 10);
                     this.particles.spawnText(this.x, this.y, '🔥 BASTIR!', '#ff6b6b', 16);
                 }
-                this.onLog.emit(`📣 Lanista emri: ${this.gladiatorName} tüm gücüyle saldırıya geçti!`);
+                this.onLog.emit(`📣 Lanista emri: ${this.gladiatorName} saldırıya geçti!`);
             } else if (type === 'DEFENSIVE') {
                 this.tacticOrder = 'DEFENSIVE';
                 this.tacticTimer = 4.5;
@@ -102,7 +157,7 @@
                     this.particles.spawnSparks(this.x, this.y, -1, 10);
                     this.particles.spawnText(this.x, this.y, '🛡️ SAVUNMA!', '#74c0fc', 16);
                 }
-                this.onLog.emit(`📣 Lanista emri: ${this.gladiatorName} savunma pozisyonu aldı!`);
+                this.onLog.emit(`📣 Lanista emri: ${this.gladiatorName} savunmaya geçti!`);
             } else if (type === 'MORALE') {
                 const healHp = Math.round(this.maxHp * 0.10);
                 const regenStam = Math.round(this.maxStamina * 0.30);
@@ -154,7 +209,9 @@
             this.fsm.addState('IDLE', {
                 enter() {
                     g.vx = 0;
-                    g.stateTimer = g.tacticOrder === 'AGGRESSIVE' ? 0.04 : (0.07 + Math.random() * 0.12);
+                    g.stateTimer = (g.tacticOrder === 'AGGRESSIVE' || g.fightStyle === 'aggressive')
+                        ? 0.04
+                        : (0.07 + Math.random() * 0.12);
                 },
                 update(dt) {
                     if (!g.opponent || g.opponent.hp <= 0) return;
@@ -165,14 +222,15 @@
 
                     const dist = Math.abs(g.opponent.x - g.x);
                     const oppState = g.opponent.fsm.currentStateName;
-                    const blockBonus = g.traitBlockBonus + (g.tacticOrder === 'DEFENSIVE' ? 0.28 : 0);
+                    const blockBonus = g.traitBlockBonus + g.styleBlockMod + (g.tacticOrder === 'DEFENSIVE' ? 0.28 : 0);
 
                     if (oppState === 'WINDUP' && dist <= g.opponent.weapon.range + 28) {
                         if (g.shield && g.shield.hasShield && g.stamina >= g.shield.staminaCost && Math.random() < (g.shield.blockChance + blockBonus)) {
                             g.fsm.transitionTo('BLOCK');
                             return;
                         }
-                        if (g.tacticOrder !== 'AGGRESSIVE' && Math.random() < (g.tacticOrder === 'DEFENSIVE' ? 0.65 : 0.35) && g.stamina >= 14) {
+                        const retChance = g.tacticOrder === 'DEFENSIVE' ? 0.65 : g.styleRetreatChance;
+                        if (g.tacticOrder !== 'AGGRESSIVE' && Math.random() < retChance && g.stamina >= 14) {
                             g.fsm.transitionTo('RETREAT', { duration: 0.30 });
                             return;
                         }
@@ -183,8 +241,8 @@
                         return;
                     }
 
-                    if ((g.weapon.type === 'spear' || g.weapon.type === 'trident') && dist < 58 && Math.random() < 0.7) {
-                        g.fsm.transitionTo('RETREAT', { duration: 0.28 });
+                    if ((g.weapon.type === 'spear' || g.weapon.type === 'trident' || g.fightStyle === 'skirmisher') && dist < 56 && Math.random() < 0.65) {
+                        g.fsm.transitionTo('RETREAT', { duration: 0.26 });
                         return;
                     }
 
@@ -202,9 +260,7 @@
             });
 
             this.fsm.addState('APPROACH', {
-                enter() {
-                    g.stateTimer = 0.45 + Math.random() * 0.30;
-                },
+                enter() { g.stateTimer = 0.45 + Math.random() * 0.30; },
                 update(dt) {
                     if (!g.opponent || g.opponent.hp <= 0) {
                         g.fsm.transitionTo('IDLE');
@@ -213,7 +269,7 @@
 
                     g._faceOpponent();
                     const dist = Math.abs(g.opponent.x - g.x);
-                    const blockBonus = g.traitBlockBonus + (g.tacticOrder === 'DEFENSIVE' ? 0.25 : 0);
+                    const blockBonus = g.traitBlockBonus + g.styleBlockMod + (g.tacticOrder === 'DEFENSIVE' ? 0.25 : 0);
 
                     if (g.opponent.fsm.currentStateName === 'WINDUP' && dist <= g.opponent.weapon.range + 22) {
                         if (g.shield && g.shield.hasShield && g.stamina >= g.shield.staminaCost && Math.random() < (g.shield.blockChance * 0.85 + blockBonus)) {
@@ -275,7 +331,7 @@
                     }
 
                     if (g.stateTimer >= g.stateDuration) {
-                        const baseCd = 0.22 + Math.max(0, (22 - g.agility) * 0.014) + g.totalWeight * 0.008;
+                        const baseCd = (0.22 + Math.max(0, (22 - g.agility) * 0.014) + g.totalWeight * 0.008) * g.styleCdMult;
                         g.attackCooldown = g.tacticOrder === 'AGGRESSIVE' ? baseCd * 0.5 : baseCd;
                         g.fsm.transitionTo('RECOVER');
                     }
@@ -289,14 +345,20 @@
                 },
                 update(dt) {
                     g.stateTimer -= dt;
-                    if (g.stateTimer <= 0) g.fsm.transitionTo('IDLE');
+                    if (g.stateTimer <= 0) {
+                        if (g.fightStyle === 'skirmisher' && Math.random() < 0.55 && g.stamina >= 15) {
+                            g.fsm.transitionTo('RETREAT', { duration: 0.25 });
+                        } else {
+                            g.fsm.transitionTo('IDLE');
+                        }
+                    }
                 }
             });
 
             this.fsm.addState('BLOCK', {
                 enter() {
                     g.vx = -g.facing * 20;
-                    g.stateTimer = g.tacticOrder === 'DEFENSIVE' ? 0.70 : (0.45 + Math.random() * 0.25);
+                    g.stateTimer = (g.tacticOrder === 'DEFENSIVE' || g.fightStyle === 'counter') ? 0.68 : (0.45 + Math.random() * 0.25);
                     g._faceOpponent();
                 },
                 update(dt) {
@@ -375,6 +437,9 @@
                 target.vx = this.facing * 110;
                 this.vx = -this.facing * 95;
 
+                if (target.fightStyle === 'counter') target.counterReady = true;
+                if (target.hasPerk('shield_master')) target.guaranteedCrit = true;
+
                 if (Game.SoundFX) Game.SoundFX.playBlock();
                 if (this.particles) {
                     this.particles.spawnSparks(hitX, target.y, -this.facing, 14);
@@ -386,7 +451,6 @@
                 }
                 this.onLog.emit(`${target.gladiatorName}, ${this.gladiatorName}'ın darbesini kalkanıyla savuşturdu!`);
 
-                // Kalkan Diken Yansıtma (Scutum)
                 if (target.hp > 0 && target.shield.effect && target.shield.effect.type === 'thorns') {
                     const thornsDmg = target.shield.effect.dmg;
                     this.hp = Math.max(0, this.hp - thornsDmg);
@@ -401,23 +465,30 @@
                 return;
             }
 
-            // Hasar ve Kritik Hesabı
             const rawCrit = 0.05 + this.agility * 0.007 + (this.weapon.critBonus || 0) + this.traitCritBonus;
             const finalCritChance = rawCrit * (1 - (target.helmet ? target.helmet.critResist : 0));
-            const isCrit = Math.random() < finalCritChance;
+            const isCrit = this.guaranteedCrit || (Math.random() < finalCritChance);
+            this.guaranteedCrit = false;
 
-            const curTargetDef = Math.max(0, target.defense - (target.activeEffects.armorBreak > 0 ? 5 : 0));
-            const effectiveDef = curTargetDef * (1 - (this.weapon.armorPen || 0));
-            let rawDamage = this.weapon.damage + this.strength * 0.65 - effectiveDef * 0.45;
+            const armorPenTotal = Math.min(0.95, (this.weapon.armorPen || 0) + (this.hasPerk('heavy_hand') ? 0.15 : 0));
+            const effectiveDef = target.getEffectiveDefense() * (1 - armorPenTotal);
+            const perkDmgBonus = this.hasPerk('heavy_hand') ? 3 : 0;
+
+            let rawDamage = (this.weapon.damage + perkDmgBonus) + this.strength * 0.65 - effectiveDef * 0.45;
             rawDamage = rawDamage * (0.9 + Math.random() * 0.2);
 
-            if (this.trait && this.trait.id === 'berserker' && this.hp <= this.maxHp * 0.35) {
-                rawDamage *= 1.30;
+            if (this.trait && this.trait.id === 'berserker' && this.hp <= this.maxHp * 0.35) rawDamage *= 1.30;
+            if (this.hasPerk('blood_scent') && target.activeEffects.bleed > 0) rawDamage *= 1.25;
+            if (this.hasPerk('executioner') && target.hp <= target.maxHp * 0.45) rawDamage *= 1.25;
+
+            if (this.counterReady) {
+                rawDamage *= 1.25;
+                this.counterReady = false;
+                if (this.particles) this.particles.spawnText(this.x, this.y - 18, '⚡ KONTRA!', '#74c0fc', 13);
             }
             if (this.tacticOrder === 'AGGRESSIVE') rawDamage *= 1.15;
             if (target.tacticOrder === 'DEFENSIVE') rawDamage *= 0.80;
 
-            // Silah Özel Efekti (Delici ekstra hasar vb.)
             let effectApplied = null;
             const weff = this.weapon.effect;
             if (weff && Math.random() < weff.chance) {
@@ -450,7 +521,6 @@
                     : `${this.gladiatorName}, ${target.gladiatorName}'a ${finalDmg} hasar vurdu.`
             );
 
-            // Buff / Debuff Uygulama
             let stunnedNow = false;
             if (target.hp > 0 && effectApplied) {
                 if (effectApplied === 'bleed') {
@@ -466,7 +536,8 @@
                     if (this.particles) this.particles.spawnText(target.x, target.y - 16, '💥 ZIRH KIRILDI!', '#ffa94d', 13);
                     this.onLog.emit(`💥 ${target.gladiatorName}'ın zırhı yarıldı!`);
                 } else if (effectApplied === 'stun') {
-                    target.activeEffects.stun = weff.duration;
+                    const stunDur = weff.duration * (target.hasPerk('iron_will') ? 0.5 : 1.0);
+                    target.activeEffects.stun = stunDur;
                     stunnedNow = true;
                     target.fsm.transitionTo('STUNNED');
                     if (this.particles) this.particles.spawnText(target.x, target.y - 16, '💫 SERSEMLEDİ!', '#ffd43b', 14);
@@ -496,6 +567,8 @@
         }
 
         _process(delta) {
+            this.updateTarget();
+
             if (this.attackCooldown > 0) this.attackCooldown -= delta;
             if (this.hitFlash > 0) this.hitFlash -= delta;
 
@@ -506,8 +579,19 @@
 
             const state = this.fsm.currentStateName;
 
-            // Debuff Süreleri & Kanama Hasarı
             if (state !== 'DEAD') {
+                // İkinci Rüzgar Perki
+                if (this.hasPerk('second_wind') && !this.secondWindUsed && this.hp > 0 && this.hp <= this.maxHp * 0.40) {
+                    this.secondWindUsed = true;
+                    this.hp = Math.min(this.maxHp, this.hp + 15);
+                    this.stamina = Math.min(this.maxStamina, this.stamina + 40);
+                    if (this.particles) {
+                        this.particles.spawnSparks(this.x, this.y, 1, 14);
+                        this.particles.spawnText(this.x, this.y - 10, '⚡ İKİNCİ RÜZGAR!', '#63e6be', 15);
+                    }
+                    this.onLog.emit(`⚡ ${this.gladiatorName} İkinci Rüzgarını yakaladı (+15 Can, +40 Stamina)!`);
+                }
+
                 if (this.activeEffects.stun > 0) this.activeEffects.stun = Math.max(0, this.activeEffects.stun - delta);
                 if (this.activeEffects.slow > 0) this.activeEffects.slow = Math.max(0, this.activeEffects.slow - delta);
                 if (this.activeEffects.armorBreak > 0) this.activeEffects.armorBreak = Math.max(0, this.activeEffects.armorBreak - delta);
@@ -548,12 +632,15 @@
 
             this.x = Math.max(this.arenaBounds.left, Math.min(this.arenaBounds.right, this.x));
 
-            if (this.opponent && this.hp > 0 && this.opponent.hp > 0) {
-                const dx = this.x - this.opponent.x;
-                const minGap = 40;
-                if (Math.abs(dx) < minGap) {
-                    const pushDir = dx >= 0 ? 1 : -1;
-                    this.x += pushDir * (minGap - Math.abs(dx)) * 0.5;
+            const others = this.allFighters.length > 0 ? this.allFighters : (this.opponent ? [this.opponent] : []);
+            for (const other of others) {
+                if (other !== this && other.hp > 0 && this.hp > 0) {
+                    const dx = this.x - other.x;
+                    const minGap = 40;
+                    if (Math.abs(dx) < minGap) {
+                        const pushDir = dx >= 0 ? 1 : -1;
+                        this.x += pushDir * (minGap - Math.abs(dx)) * 0.5;
+                    }
                 }
             }
 

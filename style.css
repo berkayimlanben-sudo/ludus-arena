@@ -458,3 +458,216 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
     color: #ffd166;
     border: 1px solid #d4af37;
 }
+
+/* FAZ 5 EK STİLLERİ */
+.fatigue-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+.fatigue-badge.fresh { background: #183623; color: #8ce99a; border: 1px solid #2b8a3e; }
+.fatigue-badge.tired { background: #423010; color: #ffd43b; border: 1px solid #e67700; }
+.fatigue-badge.exhausted { background: #4a1515; color: #ff8787; border: 1px solid #c92a2a; }
+
+.style-select-box {
+    background: #14110e;
+    border: 1px solid #382c20;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.style-select-box label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #e6b85c;
+}
+
+.style-desc {
+    font-size: 11px;
+    color: #b8a58d;
+}
+
+.opp-card.lethal-card {
+    border: 1.5px solid #c92a2a;
+    background: linear-gradient(180deg, #211212 0%, #14110e 100%);
+}
+
+.lethal-badge {
+    font-size: 10px;
+    background: #5c1414;
+    border: 1px solid #e03131;
+    color: #ffa8a8;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+}
+
+.safe-badge {
+    font-size: 10px;
+    background: #183024;
+    border: 1px solid #2b8a3e;
+    color: #8ce99a;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+/* FAZ 6 EK STİLLERİ (2v2 & PERKLER) */
+.lvl-pill {
+    font-size: 11px;
+    background: #2d241b;
+    color: #ffd166;
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid #8a6d3b;
+}
+
+.roster-card.level-ready {
+    border-color: #ffd166;
+    box-shadow: 0 0 10px rgba(255, 209, 102, 0.2);
+}
+
+.perk-alert-badge {
+    font-size: 10px;
+    background: #5c4312;
+    border: 1px solid #ffd166;
+    color: #fff3bf;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+}
+
+.xp-bar-wrap {
+    position: relative;
+    height: 12px;
+    background: #0f0c0a;
+    border: 1px solid #382c20;
+    border-radius: 4px;
+    margin-top: 5px;
+    overflow: hidden;
+}
+
+.xp-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #5f3dc4, #9775fa);
+}
+
+.xp-bar-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.perk-badge {
+    font-size: 10px;
+    background: #1f1b33;
+    border: 1px solid #7048e8;
+    color: #d0bfff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.perk-picker-box {
+    background: linear-gradient(180deg, #261f12 0%, #17130d 100%);
+    border: 2px solid #ffd166;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 12px;
+}
+
+.perk-picker-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: #ffd166;
+    margin-bottom: 8px;
+}
+
+.perk-choices-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+@media (max-width: 780px) {
+    .perk-choices-grid { grid-template-columns: 1fr; }
+}
+
+.perk-choice-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: left;
+    padding: 8px;
+    background: #1e1915;
+    border: 1px solid #8a6d3b;
+}
+
+.perk-choice-card:hover {
+    background: #2c241b;
+    border-color: #ffd166;
+}
+
+.perk-choice-card strong {
+    font-size: 12px;
+    color: #ffd166;
+}
+
+.perk-choice-card span {
+    font-size: 11px;
+    color: #d6c8b4;
+}
+
+.rule-badge {
+    font-size: 10px;
+    background: #1c2d42;
+    border: 1px solid #4a78ad;
+    color: #a5d8ff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.opp-card.team-card {
+    border: 1.5px solid #4a78ad;
+    background: linear-gradient(180deg, #131c26 0%, #14110e 100%);
+}
+
+.partner-line {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px dashed #382c20;
+    color: #a5d8ff;
+}
+
+.ally-hud {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dashed #382c20;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ally-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 700;
+}

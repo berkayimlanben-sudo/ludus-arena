@@ -23,12 +23,15 @@
     const uiDay = document.getElementById('ui-day');
     const uiGold = document.getElementById('ui-gold');
     const uiFame = document.getElementById('ui-fame');
+    const nextDayBtn = document.getElementById('btn-next-day');
     const toastEl = document.getElementById('toast-msg');
     const devPanel = document.getElementById('dev-panel');
 
     const arenaPrepView = document.getElementById('arena-prep-view');
     const arenaCombatView = document.getElementById('arena-combat-view');
     const arenaFighterSelect = document.getElementById('arena-fighter-select');
+    const arenaFighter2Wrap = document.getElementById('arena-fighter-2-wrap');
+    const arenaFighterSelect2 = document.getElementById('arena-fighter-select-2');
     const arenaOpponentsList = document.getElementById('arena-opponents-list');
 
     const leftNameEl = document.getElementById('left-name');
@@ -38,12 +41,24 @@
     const leftStamBar = document.getElementById('left-stam-bar');
     const leftStateEl = document.getElementById('left-state');
 
+    const leftAllyHud = document.getElementById('left-ally-hud');
+    const leftAllyName = document.getElementById('left-ally-name');
+    const leftAllyHpBar = document.getElementById('left-ally-hp-bar');
+    const leftAllyHpText = document.getElementById('left-ally-hp-text');
+    const leftAllyState = document.getElementById('left-ally-state');
+
     const rightNameEl = document.getElementById('right-name');
     const rightGearEl = document.getElementById('right-gear');
     const rightHpBar = document.getElementById('right-hp-bar');
     const rightHpText = document.getElementById('right-hp-text');
     const rightStamBar = document.getElementById('right-stam-bar');
     const rightStateEl = document.getElementById('right-state');
+
+    const rightAllyHud = document.getElementById('right-ally-hud');
+    const rightAllyName = document.getElementById('right-ally-name');
+    const rightAllyHpBar = document.getElementById('right-ally-hp-bar');
+    const rightAllyHpText = document.getElementById('right-ally-hp-text');
+    const rightAllyState = document.getElementById('right-ally-state');
 
     const winnerBanner = document.getElementById('winner-banner');
     const winnerText = document.getElementById('winner-text');
@@ -61,7 +76,13 @@
         toastEl.textContent = msg;
         toastEl.className = `toast ${isError ? 'error' : 'ok'}`;
         clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => { toastEl.classList.add('hidden'); }, 2600);
+        toastTimer = setTimeout(() => { toastEl.classList.add('hidden'); }, 3200);
+    }
+
+    function getFatigueBadge(fatigue) {
+        if (!fatigue || fatigue === 0) return '<span class="fatigue-badge fresh">⚡ Dinç</span>';
+        if (fatigue === 1) return '<span class="fatigue-badge tired">😓 Yorgun (-%20)</span>';
+        return '<span class="fatigue-badge exhausted">🥵 Bitkin (-%40)</span>';
     }
 
     function switchTab(tabName) {
@@ -86,6 +107,7 @@
         uiDay.textContent = isBoss ? `👑 Gün ${ludus.state.day} (BOSS!)` : `Gün ${ludus.state.day}`;
         uiGold.textContent = `🪙 ${ludus.state.gold}`;
         uiFame.textContent = `🏛️ ${ludus.state.fame} Şöhret`;
+        nextDayBtn.textContent = `🌙 Günü Bitir (-🪙${ludus.getDailyUpkeep()})`;
     }
 
     function renderLudusTab() {
@@ -103,16 +125,19 @@
             const w = Data.WEAPONS[g.weaponId];
             const trait = Data.TRAITS[g.traitId];
             const injury = g.injuryId ? Data.INJURIES[g.injuryId] : null;
+            const hasPending = Boolean(g.pendingPerkChoices);
 
             const card = document.createElement('div');
-            card.className = `roster-card ${isSel ? 'selected' : ''}`;
+            card.className = `roster-card ${isSel ? 'selected' : ''} ${hasPending ? 'level-ready' : ''}`;
             card.innerHTML = `
                 <div class="rc-top">
-                    <strong>${g.name}</strong>
+                    <strong>${g.name} <span class="lvl-pill">Sv.${g.level}</span></strong>
                     <span class="rc-origin">${g.origin}</span>
                 </div>
                 <div class="rc-tags">
+                    ${hasPending ? '<span class="perk-alert-badge">🌟 PERK SEÇ!</span>' : ''}
                     ${trait ? `<span class="trait-badge">${trait.name}</span>` : ''}
+                    ${getFatigueBadge(g.fatigue)}
                     ${injury ? `<span class="injury-badge">🩹 ${injury.name}</span>` : ''}
                 </div>
                 <div class="rc-sub">${w.name} • ${g.wins}G / ${g.losses}M</div>
@@ -137,6 +162,32 @@
             const cap = ludus.getStatCap();
             const trait = Data.TRAITS[sel.traitId];
             const injury = sel.injuryId ? Data.INJURIES[sel.injuryId] : null;
+            const curStyle = Data.FIGHT_STYLES[sel.styleId || 'balanced'];
+            const xpPct = Math.min(100, Math.round((sel.xp / sel.xpToNext) * 100));
+
+            const perkPills = (sel.perks || []).map(pid => {
+                const p = Data.PERKS[pid];
+                return p ? `<span class="perk-badge" title="${p.desc}">${p.name}</span>` : '';
+            }).join('');
+
+            let perkChoiceHTML = '';
+            if (sel.pendingPerkChoices && sel.pendingPerkChoices.length > 0) {
+                const cards = sel.pendingPerkChoices.map(pid => {
+                    const p = Data.PERKS[pid];
+                    return `
+                        <button class="perk-choice-card" data-perk="${pid}">
+                            <strong>${p.name}</strong>
+                            <span>${p.desc}</span>
+                        </button>
+                    `;
+                }).join('');
+                perkChoiceHTML = `
+                    <div class="perk-picker-box">
+                        <div class="perk-picker-title">🌟 SEVİYE ATLADI! (Sv. ${sel.level}) — Bir Perk Seç:</div>
+                        <div class="perk-choices-grid">${cards}</div>
+                    </div>
+                `;
+            }
 
             const renderEquipSelect = (label, catKey, dict, curId) => {
                 const inv = ludus.state.inventory[catKey];
@@ -152,15 +203,19 @@
                 return `<label>${label} <select class="equip-sel" data-cat="${catKey}">${opts}</select></label>`;
             };
 
+            const styleOpts = Object.values(Data.FIGHT_STYLES).map(st =>
+                `<option value="${st.id}" ${st.id === curStyle.id ? 'selected' : ''}>${st.name}</option>`
+            ).join('');
+
             const statRow = (key, label) => {
                 const cost = ludus.getTrainingCost(sel, key);
                 const maxed = sel.stats[key] >= cap;
-                const isInjuredStat = injury && injury.stat === key;
+                const penalized = (injury && injury.stat === key) || (sel.fatigue > 0);
                 const effVal = sum.eff[key];
 
                 return `
                     <div class="train-box">
-                        <span>${label}: <strong class="${isInjuredStat ? 'injured-txt' : ''}">${effVal}</strong>${isInjuredStat ? ` (${sel.stats[key]})` : ''} / ${cap}</span>
+                        <span>${label}: <strong class="${penalized ? 'injured-txt' : ''}">${effVal}</strong>${penalized ? ` (${sel.stats[key]})` : ''} / ${cap}</span>
                         <button class="train-btn" data-stat="${key}" ${maxed ? 'disabled' : ''}>
                             ${maxed ? 'MAKS' : `+1 Eğit (🪙${cost})`}
                         </button>
@@ -170,17 +225,32 @@
 
             detailEl.innerHTML = `
                 <div class="detail-header">
-                    <div>
-                        <h3>${sel.name} <span class="rc-origin">(${sel.origin})</span></h3>
-                        <div class="rc-tags" style="margin-top:4px;">
-                            ${trait ? `<span class="trait-badge" title="${trait.desc}">${trait.name}: ${trait.desc}</span>` : ''}
+                    <div style="flex:1;">
+                        <h3>${sel.name} <span class="lvl-pill">Sv.${sel.level}</span> <span class="rc-origin">(${sel.origin})</span></h3>
+                        <div class="xp-bar-wrap" title="XP: ${sel.xp} / ${sel.xpToNext}">
+                            <div class="xp-bar-fill" style="width:${xpPct}%"></div>
+                            <span class="xp-bar-text">XP: ${sel.xp} / ${sel.xpToNext}</span>
+                        </div>
+                        <div class="rc-tags" style="margin-top:6px;">
+                            ${trait ? `<span class="trait-badge">${trait.name}: ${trait.desc}</span>` : ''}
+                            ${getFatigueBadge(sel.fatigue)}
                             ${injury ? `<span class="injury-badge">🩹 ${injury.name}: ${injury.desc}</span>` : ''}
+                            ${perkPills}
                         </div>
                         <div class="summary-line">Can: ${sel.currentHp}/${sum.maxHp} | Zırh: ${sum.def} | Hız: ${sum.spd} | Ağırlık: ${sum.weight}</div>
                     </div>
                     <button id="btn-heal-glad" class="heal-btn" ${healCost === 0 ? 'disabled' : ''}>
                         ${healCost === 0 ? '💚 Sağlıklı' : `🩹 İyileştir (🪙${healCost})`}
                     </button>
+                </div>
+
+                ${perkChoiceHTML}
+
+                <div class="style-select-box">
+                    <label>🎯 Dövüş Stili:
+                        <select id="sel-fight-style">${styleOpts}</select>
+                    </label>
+                    <span class="style-desc">${curStyle.desc}</span>
                 </div>
 
                 <div class="equip-grid">
@@ -196,6 +266,19 @@
                     ${statRow('vitality', 'Canlılık')}
                 </div>
             `;
+
+            detailEl.querySelectorAll('.perk-choice-card').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    ludus.choosePerk(sel.id, btn.dataset.perk);
+                    showToast(`🌟 ${sel.name}, ${Data.PERKS[btn.dataset.perk].name} perkini kazandı!`);
+                    renderAll();
+                });
+            });
+
+            document.getElementById('sel-fight-style').addEventListener('change', (e) => {
+                ludus.setFightStyle(sel.id, e.target.value);
+                renderLudusTab();
+            });
 
             detailEl.querySelectorAll('.equip-sel').forEach(sEl => {
                 sEl.addEventListener('change', () => {
@@ -214,6 +297,7 @@
                     } else {
                         const animMap = { strength: 'TRAIN_STR', agility: 'TRAIN_AGI', vitality: 'TRAIN_VIT' };
                         ludusScene.triggerAnim(sel.id, animMap[stat]);
+                        if (res.leveledUp) showToast(`🌟 ${sel.name} Seviye Atladı! Perk seçebilirsin!`);
                     }
                     renderAll();
                 });
@@ -345,16 +429,32 @@
         arenaCombatView.classList.toggle('hidden', !matchInProgress);
         if (matchInProgress) return;
 
-        arenaFighterSelect.innerHTML = '';
-        ludus.state.roster.forEach(g => {
-            const maxHp = ludus.getGladiatorMaxHp(g);
-            const injText = g.injuryId ? ` [🩹 ${Data.INJURIES[g.injuryId].name}]` : '';
-            const opt = document.createElement('option');
-            opt.value = g.id;
-            opt.textContent = `${g.name} (Can: ${g.currentHp}/${maxHp} • ${Data.WEAPONS[g.weaponId].name})${injText}`;
-            if (g.id === ludus.state.selectedGladiatorId) opt.selected = true;
-            arenaFighterSelect.appendChild(opt);
-        });
+        const has2v2Today = ludus.state.dailyOpponents.some(o => o.ruleId === 'team_2v2' && !o.completed);
+        arenaFighter2Wrap.classList.toggle('hidden', !has2v2Today);
+
+        const fillSelect = (selEl, defaultIdx) => {
+            const prevVal = selEl.value;
+            selEl.innerHTML = '';
+            ludus.state.roster.forEach((g, idx) => {
+                const maxHp = ludus.getGladiatorMaxHp(g);
+                const injText = g.injuryId ? ` [🩹 ${Data.INJURIES[g.injuryId].name}]` : '';
+                const fatText = g.fatigue >= 2 ? ' [🥵 Bitkin]' : (g.fatigue === 1 ? ' [😓 Yorgun]' : '');
+                const stName = Data.FIGHT_STYLES[g.styleId || 'balanced'].name;
+
+                const opt = document.createElement('option');
+                opt.value = g.id;
+                opt.textContent = `${g.name} (Sv.${g.level} • ${g.currentHp}/${maxHp} Can • ${Data.WEAPONS[g.weaponId].name} • ${stName})${fatText}${injText}`;
+                if (prevVal && g.id === prevVal) opt.selected = true;
+                else if (!prevVal && idx === defaultIdx) opt.selected = true;
+                selEl.appendChild(opt);
+            });
+        };
+
+        fillSelect(arenaFighterSelect, 0);
+        if (ludus.state.selectedGladiatorId && ludus.state.roster.some(g => g.id === ludus.state.selectedGladiatorId)) {
+            arenaFighterSelect.value = ludus.state.selectedGladiatorId;
+        }
+        fillSelect(arenaFighterSelect2, ludus.state.roster.length > 1 ? 1 : 0);
 
         arenaFighterSelect.onchange = () => {
             ludus.state.selectedGladiatorId = arenaFighterSelect.value;
@@ -367,27 +467,56 @@
             const a = Data.ARMORS[opp.armorId];
             const h = Data.HELMETS[opp.helmetId];
             const trait = Data.TRAITS[opp.traitId];
+            const rule = Data.ARENA_RULES[opp.ruleId || 'standard'];
+
+            const cardClass = [
+                'opp-card',
+                opp.isBoss ? 'boss-card' : '',
+                opp.lethal && !opp.isBoss ? 'lethal-card' : '',
+                opp.ruleId === 'team_2v2' ? 'team-card' : '',
+                opp.completed ? 'done' : ''
+            ].filter(Boolean).join(' ');
+
+            const matchTypeTag = opp.lethal
+                ? '<span class="lethal-badge">💀 ÖLÜMÜNE (Kalıcı Ölüm!)</span>'
+                : '<span class="safe-badge">🛡️ Gösteri</span>';
+
+            const ruleTag = opp.ruleId !== 'standard'
+                ? `<span class="rule-badge">${rule.name}</span>`
+                : '';
+
+            let partnerHTML = '';
+            if (opp.ruleId === 'team_2v2' && opp.partner) {
+                const pw = Data.WEAPONS[opp.partner.weaponId];
+                const ps = Data.SHIELDS[opp.partner.shieldId];
+                partnerHTML = `<div class="partner-line">➕ Ortak: <b>${opp.partner.name}</b> (~${opp.partner.maxHp} Can, ${pw.name}${ps.hasShield ? '+' + ps.name : ''})</div>`;
+            }
 
             const card = document.createElement('div');
-            card.className = `opp-card ${opp.isBoss ? 'boss-card' : ''} ${opp.completed ? 'done' : ''}`;
+            card.className = cardClass;
             card.innerHTML = `
                 <div class="oc-top">
                     <span class="badge ${opp.isBoss ? 'boss-badge' : ''}">${opp.tierName}</span>
                     <strong>${opp.name}</strong>
                 </div>
-                ${trait ? `<div><span class="trait-badge">${trait.name}</span></div>` : ''}
+                <div class="rc-tags">
+                    ${matchTypeTag}
+                    ${ruleTag}
+                    ${trait ? `<span class="trait-badge">${trait.name}</span>` : ''}
+                </div>
                 <div class="oc-scout">
                     <div>❤️ Can: ~${opp.maxHp} | Güç ${opp.stats.strength} / Çev ${opp.stats.agility}</div>
                     <div>⚔️ ${w.name}${s.hasShield ? ' + ' + s.name : ''}</div>
                     <div>🛡️ ${a.name}${h.id !== 'none' ? ' + ' + h.name : ''}</div>
+                    ${partnerHTML}
                 </div>
                 <div class="oc-reward">Ödül: 🪙${opp.rewardGold} Altın • 🏛️ +${opp.rewardFame} Şöhret</div>
                 <button class="primary-btn fight-start-btn" ${opp.completed ? 'disabled' : ''}>
-                    ${opp.completed ? '✔️ Tamamlandı' : (opp.isBoss ? '👑 BOSS İLE KAPIŞ!' : '⚔️ Arenaya Çık!')}
+                    ${opp.completed ? '✔️ Tamamlandı' : (opp.isBoss ? '👑 BOSS İLE KAPIŞ!' : (opp.ruleId === 'team_2v2' ? '⚔️ 2v2 MAÇA ÇIK!' : (opp.lethal ? '💀 ÖLÜMÜNE ÇIK!' : '⚔️ Arenaya Çık!')))}
                 </button>
             `;
             card.querySelector('.fight-start-btn').addEventListener('click', () => {
-                startArenaMatch(arenaFighterSelect.value, opp);
+                startArenaMatch(opp);
             });
             arenaOpponentsList.appendChild(card);
         });
@@ -398,19 +527,61 @@
         line.className = 'log-line';
         line.textContent = msg;
         battleLogEl.prepend(line);
-        while (battleLogEl.children.length > 25) {
+        while (battleLogEl.children.length > 30) {
             battleLogEl.removeChild(battleLogEl.lastChild);
         }
     }
 
-    function startArenaMatch(myGladId, opp) {
-        const myGlad = ludus.state.roster.find(g => g.id === myGladId);
-        if (!myGlad) return;
+    function toGladiatorConfig(g, isBoss = false) {
+        return {
+            name: g.name,
+            skinColor: g.skinColor,
+            isBoss,
+            currentHp: g.currentHp,
+            fatigue: g.fatigue || 0,
+            fightStyle: g.styleId || 'balanced',
+            perks: g.perks || [],
+            trait: Data.TRAITS[g.traitId] || null,
+            injury: g.injuryId ? Data.INJURIES[g.injuryId] : null,
+            stats: Object.assign({}, g.stats),
+            weapon: Data.WEAPONS[g.weaponId],
+            shield: Data.SHIELDS[g.shieldId],
+            armor: Data.ARMORS[g.armorId],
+            helmet: Data.HELMETS[g.helmetId]
+        };
+    }
 
-        const maxHp = ludus.getGladiatorMaxHp(myGlad);
-        if (myGlad.currentHp < Math.ceil(maxHp * 0.25)) {
-            showToast(`${myGlad.name} çok yaralı! Önce Revirde iyileştir veya günü bitir.`, true);
+    function startArenaMatch(opp) {
+        const is2v2 = opp.ruleId === 'team_2v2' && opp.partner;
+        const selectedIds = is2v2
+            ? [arenaFighterSelect.value, arenaFighterSelect2.value]
+            : [arenaFighterSelect.value];
+
+        if (is2v2 && selectedIds[0] === selectedIds[1]) {
+            showToast('2v2 maç için 2 FARKLI gladyatör seçmelisin!', true);
             return;
+        }
+
+        const myGlads = selectedIds.map(id => ludus.state.roster.find(g => g.id === id)).filter(Boolean);
+        if (myGlads.length !== selectedIds.length) return;
+
+        for (const g of myGlads) {
+            const maxHp = ludus.getGladiatorMaxHp(g);
+            if (g.currentHp < Math.ceil(maxHp * 0.25)) {
+                showToast(`${g.name} çok yaralı! Önce iyileştir veya başka dövüşçü seç.`, true);
+                return;
+            }
+            const ruleCheck = ludus.validateFighterForRule(g, opp.ruleId);
+            if (!ruleCheck.ok) {
+                showToast(ruleCheck.msg, true);
+                return;
+            }
+        }
+
+        if (opp.lethal) {
+            const names = myGlads.map(g => g.name).join(' ve ');
+            const ok = confirm(`⚠️ DİKKAT: Bu ÖLÜMÜNE bir maç!\n${names} yenilirse KALICI OLARAK ÖLECEK.\n\nYine de arenaya çıksın mı?`);
+            if (!ok) return;
         }
 
         matchInProgress = true;
@@ -420,44 +591,29 @@
         battleLogEl.innerHTML = '';
         winnerBanner.classList.add('hidden');
 
-        const leftConfig = {
-            name: myGlad.name,
-            skinColor: myGlad.skinColor,
-            currentHp: myGlad.currentHp,
-            trait: Data.TRAITS[myGlad.traitId] || null,
-            injury: myGlad.injuryId ? Data.INJURIES[myGlad.injuryId] : null,
-            stats: Object.assign({}, myGlad.stats),
-            weapon: Data.WEAPONS[myGlad.weaponId],
-            shield: Data.SHIELDS[myGlad.shieldId],
-            armor: Data.ARMORS[myGlad.armorId],
-            helmet: Data.HELMETS[myGlad.helmetId]
-        };
+        const leftConfigs = myGlads.map(g => toGladiatorConfig(g, false));
+        const rightConfigs = is2v2
+            ? [toGladiatorConfig(opp, false), toGladiatorConfig(opp.partner, false)]
+            : [toGladiatorConfig(opp, Boolean(opp.isBoss))];
 
-        const rightConfig = {
-            name: opp.name,
-            skinColor: opp.skinColor,
-            isBoss: Boolean(opp.isBoss),
-            trait: Data.TRAITS[opp.traitId] || null,
-            stats: Object.assign({}, opp.stats),
-            weapon: Data.WEAPONS[opp.weaponId],
-            shield: Data.SHIELDS[opp.shieldId],
-            armor: Data.ARMORS[opp.armorId],
-            helmet: Data.HELMETS[opp.helmetId]
-        };
-
-        currentArena = new Game.ArenaScene(leftConfig, rightConfig);
+        currentArena = new Game.ArenaScene(leftConfigs, rightConfigs);
         currentArena.onBattleLog.connect(addLog);
 
-        currentArena.onMatchFinished.connect((winner) => {
-            const didWin = winner === currentArena.leftFighter;
-            const res = ludus.recordMatchResult(myGlad.id, opp.id, didWin, currentArena.leftFighter.hp);
+        currentArena.onMatchFinished.connect((_, teamSide) => {
+            const didWin = teamSide === 'left';
+            const remHps = currentArena.leftTeam.map(f => f.hp);
+            const res = ludus.recordTeamMatchResult(selectedIds, opp.id, didWin, remHps);
             renderTopStats();
 
             if (didWin) {
-                winnerText.textContent = `🏆 ZAFER! +${res.goldEarned} Altın, +${res.fameEarned} Şöhret`;
+                const lvlMsg = res.leveledNames.length > 0 ? ` 🌟 SEVİYE ATLADI: ${res.leveledNames.join(', ')}!` : '';
+                winnerText.textContent = `🏆 ZAFER! +${res.goldEarned} Altın, +${res.fameEarned} Şöhret (+${res.xpReward} XP)${lvlMsg}`;
+            } else if (res.deadNames.length > 0) {
+                const rookieMsg = res.rescuedByRookie ? ' (Sokaktan yeni bir çaylak katıldı!)' : '';
+                winnerText.textContent = `⚰️ ${res.deadNames.join(', ')} ARENADA CAN VERDİ!${rookieMsg}`;
             } else {
-                const injTxt = res.injuryName ? ` • 🩹 ${res.injuryName}` : '';
-                winnerText.textContent = `💀 YENİLGİ! (${myGlad.name} düştü${injTxt} • +${res.goldEarned} Altın)`;
+                const injTxt = res.injuries.length > 0 ? ` • 🩹 ${res.injuries[0]}` : '';
+                winnerText.textContent = `💀 YENİLGİ! (+${res.goldEarned} Altın, +${res.xpReward} XP${injTxt})`;
             }
             winnerBanner.classList.remove('hidden');
         });
@@ -465,12 +621,21 @@
         tree.changeScene(currentArena);
         tree.paused = false;
 
-        const L = currentArena.leftFighter;
-        const R = currentArena.rightFighter;
-        leftNameEl.textContent = L.gladiatorName;
-        leftGearEl.textContent = `${L.weapon.name}${L.shield.hasShield ? ' + ' + L.shield.name : ''} • ${L.armor.name}`;
-        rightNameEl.textContent = R.gladiatorName;
-        rightGearEl.textContent = `${R.weapon.name}${R.shield.hasShield ? ' + ' + R.shield.name : ''} • ${R.armor.name}`;
+        // HUD Hazırlığı (1v1 ve 2v2)
+        const L1 = currentArena.leftTeam[0];
+        const R1 = currentArena.rightTeam[0];
+        leftNameEl.textContent = L1.gladiatorName;
+        leftGearEl.textContent = `${L1.weapon.name}${L1.shield.hasShield ? ' + ' + L1.shield.name : ''} • ${L1.armor.name}`;
+        rightNameEl.textContent = R1.gladiatorName;
+        rightGearEl.textContent = `${R1.weapon.name}${R1.shield.hasShield ? ' + ' + R1.shield.name : ''} • ${R1.armor.name}`;
+
+        const hasLeft2 = currentArena.leftTeam.length > 1;
+        const hasRight2 = currentArena.rightTeam.length > 1;
+        leftAllyHud.classList.toggle('hidden', !hasLeft2);
+        rightAllyHud.classList.toggle('hidden', !hasRight2);
+
+        if (hasLeft2) leftAllyName.textContent = currentArena.leftTeam[1].gladiatorName;
+        if (hasRight2) rightAllyName.textContent = currentArena.rightTeam[1].gladiatorName;
     }
 
     returnLudusBtn.addEventListener('click', () => {
@@ -498,19 +663,32 @@
 
     tree.onFrameUpdate.connect(() => {
         if (!matchInProgress || !currentArena) return;
-        const L = currentArena.leftFighter;
-        const R = currentArena.rightFighter;
-        if (!L || !R) return;
+        const L1 = currentArena.leftTeam[0];
+        const R1 = currentArena.rightTeam[0];
+        if (!L1 || !R1) return;
 
-        leftHpBar.style.width = `${(L.hp / L.maxHp) * 100}%`;
-        leftHpText.textContent = `${L.hp} / ${L.maxHp}`;
-        leftStamBar.style.width = `${(L.stamina / L.maxStamina) * 100}%`;
-        leftStateEl.textContent = L.getStateLabel();
+        leftHpBar.style.width = `${(L1.hp / L1.maxHp) * 100}%`;
+        leftHpText.textContent = `${L1.hp} / ${L1.maxHp}`;
+        leftStamBar.style.width = `${(L1.stamina / L1.maxStamina) * 100}%`;
+        leftStateEl.textContent = L1.getStateLabel();
 
-        rightHpBar.style.width = `${(R.hp / R.maxHp) * 100}%`;
-        rightHpText.textContent = `${R.hp} / ${R.maxHp}`;
-        rightStamBar.style.width = `${(R.stamina / R.maxStamina) * 100}%`;
-        rightStateEl.textContent = R.getStateLabel();
+        rightHpBar.style.width = `${(R1.hp / R1.maxHp) * 100}%`;
+        rightHpText.textContent = `${R1.hp} / ${R1.maxHp}`;
+        rightStamBar.style.width = `${(R1.stamina / R1.maxStamina) * 100}%`;
+        rightStateEl.textContent = R1.getStateLabel();
+
+        if (currentArena.leftTeam.length > 1) {
+            const L2 = currentArena.leftTeam[1];
+            leftAllyHpBar.style.width = `${(L2.hp / L2.maxHp) * 100}%`;
+            leftAllyHpText.textContent = `${L2.hp} / ${L2.maxHp}`;
+            leftAllyState.textContent = L2.getStateLabel();
+        }
+        if (currentArena.rightTeam.length > 1) {
+            const R2 = currentArena.rightTeam[1];
+            rightAllyHpBar.style.width = `${(R2.hp / R2.maxHp) * 100}%`;
+            rightAllyHpText.textContent = `${R2.hp} / ${R2.maxHp}`;
+            rightAllyState.textContent = R2.getStateLabel();
+        }
 
         const labels = {
             AGGRESSIVE: '🔥 BASTIR!',
@@ -541,7 +719,6 @@
         else if (activeTab === 'arena') renderArenaTab();
     }
 
-    // TEST / GELİŞTİRİCİ PANELİ
     document.getElementById('btn-toggle-dev').addEventListener('click', () => {
         devPanel.classList.toggle('hidden');
     });
@@ -555,10 +732,23 @@
         showToast('🛠️ Test: +25 Şöhret eklendi!');
         renderAll();
     });
+    document.getElementById('dev-add-xp').addEventListener('click', () => {
+        const sel = ludus.getSelectedGladiator();
+        if (!sel) return;
+        const leveled = ludus.devAddXp(sel.id, 100);
+        showToast(leveled ? `🌟 ${sel.name} Seviye Atladı! Ludus'ta Perk seç!` : `🛠️ ${sel.name} +100 XP aldı!`);
+        renderAll();
+    });
+    document.getElementById('dev-spawn-2v2').addEventListener('click', () => {
+        if (matchInProgress) return;
+        const hired = ludus.devSpawn2v2();
+        showToast(hired ? '⚔️ 2v2 Kontratı + Test Ortağı Agron eklendi! Arena sekmesine bak.' : '⚔️ Arena sekmesine yeni 2v2 Maç eklendi!');
+        renderAll();
+    });
     document.getElementById('dev-boss-day').addEventListener('click', () => {
         if (matchInProgress) return;
         ludus.devJumpToBossDay();
-        showToast(`👑 Test: Gün ${ludus.state.day} (BOSS GÜNÜ) açıldı! Arena sekmesine bak.`);
+        showToast(`👑 Test: Gün ${ludus.state.day} (BOSS GÜNÜ) açıldı!`);
         renderAll();
     });
     document.getElementById('dev-heal-all').addEventListener('click', () => {
@@ -573,9 +763,15 @@
 
     document.getElementById('btn-next-day').addEventListener('click', () => {
         if (matchInProgress) return;
-        ludus.nextDay();
+        const info = ludus.nextDay();
         const isBoss = ludus.state.day % 5 === 0;
-        showToast(isBoss ? `👑 Gün ${ludus.state.day}: ŞAMPİYONA BOSS GÜNÜ!` : `Gün ${ludus.state.day} başladı!`);
+        if (info.starved) {
+            showToast(`⚠️ Erzak parası yetmedi (-🪙${info.upkeep})! Kadro yarı yarıya iyileşti.`, true);
+        } else if (isBoss) {
+            showToast(`👑 Gün ${ludus.state.day}: ŞAMPİYONA BOSS GÜNÜ! (-🪙${info.upkeep})`);
+        } else {
+            showToast(`Gün ${ludus.state.day} başladı! (-🪙${info.upkeep} masraf)`);
+        }
         renderAll();
     });
 
