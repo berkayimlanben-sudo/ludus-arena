@@ -14,6 +14,8 @@
             this.winner = null;
             this.matchTime = 0;
 
+            this.tacticCooldowns = { AGGRESSIVE: 0, DEFENSIVE: 0, MORALE: 0 };
+
             this.onBattleLog = new Engine.Signal();
             this.onMatchFinished = new Engine.Signal();
 
@@ -64,6 +66,20 @@
             this.onBattleLog.emit(`🔔 DÜELLO BAŞLADI: ${this.leftFighter.gladiatorName} vs ${this.rightFighter.gladiatorName}!`);
         }
 
+        issueTactic(type) {
+            if (this.matchEnded || !this.leftFighter || this.leftFighter.hp <= 0) return false;
+            if (this.tacticCooldowns[type] > 0) return false;
+
+            this.leftFighter.applyTactic(type);
+            if (type === 'MORALE') {
+                this.crowdExcitement = 1.0;
+                this.tacticCooldowns.MORALE = 13;
+            } else {
+                this.tacticCooldowns[type] = 9;
+            }
+            return true;
+        }
+
         _endMatch(winner) {
             if (this.matchEnded) return;
             this.matchEnded = true;
@@ -74,7 +90,15 @@
         }
 
         _process(delta) {
-            if (!this.matchEnded) this.matchTime += delta;
+            if (!this.matchEnded) {
+                this.matchTime += delta;
+                Object.keys(this.tacticCooldowns).forEach(k => {
+                    if (this.tacticCooldowns[k] > 0) {
+                        this.tacticCooldowns[k] = Math.max(0, this.tacticCooldowns[k] - delta);
+                    }
+                });
+            }
+
             this.crowdTime += delta * (3 + this.crowdExcitement * 10);
             this.crowdExcitement = Math.max(0, this.crowdExcitement - delta * 0.45);
 

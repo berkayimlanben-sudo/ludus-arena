@@ -4,8 +4,15 @@
     const Data = window.LudusData;
 
     const ludus = new Game.LudusManager();
-    const canvas = document.getElementById('arena-canvas');
-    const tree = new Engine.SceneTree(canvas);
+
+    const ludusCanvas = document.getElementById('ludus-canvas');
+    const ludusTree = new Engine.SceneTree(ludusCanvas);
+    const ludusScene = new Game.LudusScene();
+    ludusTree.changeScene(ludusScene);
+    ludusTree.start();
+
+    const arenaCanvas = document.getElementById('arena-canvas');
+    const tree = new Engine.SceneTree(arenaCanvas);
     tree.paused = true;
     tree.start();
 
@@ -13,13 +20,12 @@
     let matchInProgress = false;
     let currentArena = null;
 
-    // Üst Bar
     const uiDay = document.getElementById('ui-day');
     const uiGold = document.getElementById('ui-gold');
     const uiFame = document.getElementById('ui-fame');
     const toastEl = document.getElementById('toast-msg');
+    const devPanel = document.getElementById('dev-panel');
 
-    // Arena Elemanları
     const arenaPrepView = document.getElementById('arena-prep-view');
     const arenaCombatView = document.getElementById('arena-combat-view');
     const arenaFighterSelect = document.getElementById('arena-fighter-select');
@@ -44,6 +50,12 @@
     const returnLudusBtn = document.getElementById('return-ludus-btn');
     const battleLogEl = document.getElementById('battle-log');
 
+    const tacticBtns = {
+        AGGRESSIVE: document.getElementById('tactic-aggressive'),
+        DEFENSIVE: document.getElementById('tactic-defensive'),
+        MORALE: document.getElementById('tactic-morale')
+    };
+
     let toastTimer = null;
     function showToast(msg, isError = false) {
         toastEl.textContent = msg;
@@ -58,6 +70,8 @@
             return;
         }
         activeTab = tabName;
+        ludusTree.paused = (tabName !== 'ludus');
+
         document.querySelectorAll('.tab-btn').forEach(b => {
             b.classList.toggle('active', b.dataset.tab === tabName);
         });
@@ -68,23 +82,27 @@
     }
 
     function renderTopStats() {
-        uiDay.textContent = `Gün ${ludus.state.day}`;
+        const isBoss = ludus.state.day % 5 === 0;
+        uiDay.textContent = isBoss ? `👑 Gün ${ludus.state.day} (BOSS!)` : `Gün ${ludus.state.day}`;
         uiGold.textContent = `🪙 ${ludus.state.gold}`;
         uiFame.textContent = `🏛️ ${ludus.state.fame} Şöhret`;
     }
 
     function renderLudusTab() {
+        ludusScene.syncFromState(ludus.state);
+
         const rosterEl = document.getElementById('roster-list');
         const detailEl = document.getElementById('selected-gladiator-panel');
         const buildingsEl = document.getElementById('buildings-list');
 
-        // 1. Kadro Listesi
         rosterEl.innerHTML = '';
         ludus.state.roster.forEach(g => {
             const maxHp = ludus.getGladiatorMaxHp(g);
             const pct = Math.round((g.currentHp / maxHp) * 100);
             const isSel = g.id === ludus.state.selectedGladiatorId;
             const w = Data.WEAPONS[g.weaponId];
+            const trait = Data.TRAITS[g.traitId];
+            const injury = g.injuryId ? Data.INJURIES[g.injuryId] : null;
 
             const card = document.createElement('div');
             card.className = `roster-card ${isSel ? 'selected' : ''}`;
@@ -92,6 +110,10 @@
                 <div class="rc-top">
                     <strong>${g.name}</strong>
                     <span class="rc-origin">${g.origin}</span>
+                </div>
+                <div class="rc-tags">
+                    ${trait ? `<span class="trait-badge">${trait.name}</span>` : ''}
+                    ${injury ? `<span class="injury-badge">🩹 ${injury.name}</span>` : ''}
                 </div>
                 <div class="rc-sub">${w.name} • ${g.wins}G / ${g.losses}M</div>
                 <div class="bar-wrap hp small">
@@ -106,7 +128,6 @@
             rosterEl.appendChild(card);
         });
 
-        // 2. Seçili Gladyatör Detayı
         const sel = ludus.getSelectedGladiator();
         if (!sel) {
             detailEl.innerHTML = '<p>Kadroda gladyatör yok. Köle Pazarından birini al!</p>';
@@ -114,6 +135,8 @@
             const sum = ludus.getGladiatorSummary(sel);
             const healCost = ludus.getHealCost(sel);
             const cap = ludus.getStatCap();
+            const trait = Data.TRAITS[sel.traitId];
+            const injury = sel.injuryId ? Data.INJURIES[sel.injuryId] : null;
 
             const renderEquipSelect = (label, catKey, dict, curId) => {
                 const inv = ludus.state.inventory[catKey];
@@ -132,9 +155,12 @@
             const statRow = (key, label) => {
                 const cost = ludus.getTrainingCost(sel, key);
                 const maxed = sel.stats[key] >= cap;
+                const isInjuredStat = injury && injury.stat === key;
+                const effVal = sum.eff[key];
+
                 return `
                     <div class="train-box">
-                        <span>${label}: <strong>${sel.stats[key]}</strong> / ${cap}</span>
+                        <span>${label}: <strong class="${isInjuredStat ? 'injured-txt' : ''}">${effVal}</strong>${isInjuredStat ? ` (${sel.stats[key]})` : ''} / ${cap}</span>
                         <button class="train-btn" data-stat="${key}" ${maxed ? 'disabled' : ''}>
                             ${maxed ? 'MAKS' : `+1 Eğit (🪙${cost})`}
                         </button>
@@ -146,10 +172,14 @@
                 <div class="detail-header">
                     <div>
                         <h3>${sel.name} <span class="rc-origin">(${sel.origin})</span></h3>
+                        <div class="rc-tags" style="margin-top:4px;">
+                            ${trait ? `<span class="trait-badge" title="${trait.desc}">${trait.name}: ${trait.desc}</span>` : ''}
+                            ${injury ? `<span class="injury-badge">🩹 ${injury.name}: ${injury.desc}</span>` : ''}
+                        </div>
                         <div class="summary-line">Can: ${sel.currentHp}/${sum.maxHp} | Zırh: ${sum.def} | Hız: ${sum.spd} | Ağırlık: ${sum.weight}</div>
                     </div>
                     <button id="btn-heal-glad" class="heal-btn" ${healCost === 0 ? 'disabled' : ''}>
-                        ${healCost === 0 ? '💚 Can Dolu' : `🩹 İyileştir (🪙${healCost})`}
+                        ${healCost === 0 ? '💚 Sağlıklı' : `🩹 İyileştir (🪙${healCost})`}
                     </button>
                 </div>
 
@@ -177,9 +207,14 @@
 
             detailEl.querySelectorAll('.train-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
-                    const res = ludus.trainStat(sel.id, btn.dataset.stat);
-                    if (!res.ok && res.msg) showToast(res.msg, true);
-                    else showToast(`${sel.name} antrenman yaptı!`);
+                    const stat = btn.dataset.stat;
+                    const res = ludus.trainStat(sel.id, stat);
+                    if (!res.ok && res.msg) {
+                        showToast(res.msg, true);
+                    } else {
+                        const animMap = { strength: 'TRAIN_STR', agility: 'TRAIN_AGI', vitality: 'TRAIN_VIT' };
+                        ludusScene.triggerAnim(sel.id, animMap[stat]);
+                    }
                     renderAll();
                 });
             });
@@ -189,13 +224,12 @@
                 healBtn.addEventListener('click', () => {
                     const res = ludus.healGladiator(sel.id);
                     if (!res.ok && res.msg) showToast(res.msg, true);
-                    else showToast(`${sel.name} tedavi edildi!`);
+                    else ludusScene.triggerAnim(sel.id, 'HEAL');
                     renderAll();
                 });
             }
         }
 
-        // 3. Ludus Binaları
         buildingsEl.innerHTML = '';
         Object.values(Data.BUILDINGS).forEach(b => {
             const lvl = ludus.state.buildings[b.id];
@@ -279,6 +313,7 @@
         ludus.state.marketRecruits.forEach(rec => {
             const w = Data.WEAPONS[rec.weaponId];
             const a = Data.ARMORS[rec.armorId];
+            const trait = Data.TRAITS[rec.traitId];
             const card = document.createElement('div');
             card.className = 'market-card';
             card.innerHTML = `
@@ -286,6 +321,7 @@
                     <strong>${rec.name}</strong>
                     <span class="rc-origin">${rec.origin}</span>
                 </div>
+                ${trait ? `<div><span class="trait-badge">${trait.name}: ${trait.desc}</span></div>` : ''}
                 <div class="mc-stats">
                     Güç: <b>${rec.stats.strength}</b> • Çeviklik: <b>${rec.stats.agility}</b> • Canlılık: <b>${rec.stats.vitality}</b>
                 </div>
@@ -309,13 +345,13 @@
         arenaCombatView.classList.toggle('hidden', !matchInProgress);
         if (matchInProgress) return;
 
-        // Gladyatör seçici
         arenaFighterSelect.innerHTML = '';
         ludus.state.roster.forEach(g => {
             const maxHp = ludus.getGladiatorMaxHp(g);
+            const injText = g.injuryId ? ` [🩹 ${Data.INJURIES[g.injuryId].name}]` : '';
             const opt = document.createElement('option');
             opt.value = g.id;
-            opt.textContent = `${g.name} (Can: ${g.currentHp}/${maxHp} • ${Data.WEAPONS[g.weaponId].name})`;
+            opt.textContent = `${g.name} (Can: ${g.currentHp}/${maxHp} • ${Data.WEAPONS[g.weaponId].name})${injText}`;
             if (g.id === ludus.state.selectedGladiatorId) opt.selected = true;
             arenaFighterSelect.appendChild(opt);
         });
@@ -324,21 +360,22 @@
             ludus.state.selectedGladiatorId = arenaFighterSelect.value;
         };
 
-        // Rakip sözleşmeleri
         arenaOpponentsList.innerHTML = '';
         ludus.state.dailyOpponents.forEach(opp => {
             const w = Data.WEAPONS[opp.weaponId];
             const s = Data.SHIELDS[opp.shieldId];
             const a = Data.ARMORS[opp.armorId];
             const h = Data.HELMETS[opp.helmetId];
+            const trait = Data.TRAITS[opp.traitId];
 
             const card = document.createElement('div');
-            card.className = `opp-card ${opp.completed ? 'done' : ''}`;
+            card.className = `opp-card ${opp.isBoss ? 'boss-card' : ''} ${opp.completed ? 'done' : ''}`;
             card.innerHTML = `
                 <div class="oc-top">
-                    <span class="badge">${opp.tierName} (${opp.badge})</span>
+                    <span class="badge ${opp.isBoss ? 'boss-badge' : ''}">${opp.tierName}</span>
                     <strong>${opp.name}</strong>
                 </div>
+                ${trait ? `<div><span class="trait-badge">${trait.name}</span></div>` : ''}
                 <div class="oc-scout">
                     <div>❤️ Can: ~${opp.maxHp} | Güç ${opp.stats.strength} / Çev ${opp.stats.agility}</div>
                     <div>⚔️ ${w.name}${s.hasShield ? ' + ' + s.name : ''}</div>
@@ -346,7 +383,7 @@
                 </div>
                 <div class="oc-reward">Ödül: 🪙${opp.rewardGold} Altın • 🏛️ +${opp.rewardFame} Şöhret</div>
                 <button class="primary-btn fight-start-btn" ${opp.completed ? 'disabled' : ''}>
-                    ${opp.completed ? '✔️ Tamamlandı' : '⚔️ Arenaya Çık!'}
+                    ${opp.completed ? '✔️ Tamamlandı' : (opp.isBoss ? '👑 BOSS İLE KAPIŞ!' : '⚔️ Arenaya Çık!')}
                 </button>
             `;
             card.querySelector('.fight-start-btn').addEventListener('click', () => {
@@ -377,6 +414,7 @@
         }
 
         matchInProgress = true;
+        ludusTree.paused = true;
         arenaPrepView.classList.add('hidden');
         arenaCombatView.classList.remove('hidden');
         battleLogEl.innerHTML = '';
@@ -386,6 +424,8 @@
             name: myGlad.name,
             skinColor: myGlad.skinColor,
             currentHp: myGlad.currentHp,
+            trait: Data.TRAITS[myGlad.traitId] || null,
+            injury: myGlad.injuryId ? Data.INJURIES[myGlad.injuryId] : null,
             stats: Object.assign({}, myGlad.stats),
             weapon: Data.WEAPONS[myGlad.weaponId],
             shield: Data.SHIELDS[myGlad.shieldId],
@@ -396,6 +436,8 @@
         const rightConfig = {
             name: opp.name,
             skinColor: opp.skinColor,
+            isBoss: Boolean(opp.isBoss),
+            trait: Data.TRAITS[opp.traitId] || null,
             stats: Object.assign({}, opp.stats),
             weapon: Data.WEAPONS[opp.weaponId],
             shield: Data.SHIELDS[opp.shieldId],
@@ -414,7 +456,8 @@
             if (didWin) {
                 winnerText.textContent = `🏆 ZAFER! +${res.goldEarned} Altın, +${res.fameEarned} Şöhret`;
             } else {
-                winnerText.textContent = `💀 YENİLGİ! (${myGlad.name} yaralı düştü • +${res.goldEarned} Altın)`;
+                const injTxt = res.injuryName ? ` • 🩹 ${res.injuryName}` : '';
+                winnerText.textContent = `💀 YENİLGİ! (${myGlad.name} düştü${injTxt} • +${res.goldEarned} Altın)`;
             }
             winnerBanner.classList.remove('hidden');
         });
@@ -436,6 +479,23 @@
         switchTab('ludus');
     });
 
+    ludusCanvas.addEventListener('click', (e) => {
+        const rect = ludusCanvas.getBoundingClientRect();
+        const scaleX = ludusCanvas.width / rect.width;
+        const clickX = (e.clientX - rect.left) * scaleX;
+        const hitId = ludusScene.findActorAt(clickX);
+        if (hitId) {
+            ludus.state.selectedGladiatorId = hitId;
+            renderLudusTab();
+        }
+    });
+
+    Object.keys(tacticBtns).forEach(type => {
+        tacticBtns[type].addEventListener('click', () => {
+            if (currentArena) currentArena.issueTactic(type);
+        });
+    });
+
     tree.onFrameUpdate.connect(() => {
         if (!matchInProgress || !currentArena) return;
         const L = currentArena.leftFighter;
@@ -451,6 +511,26 @@
         rightHpText.textContent = `${R.hp} / ${R.maxHp}`;
         rightStamBar.style.width = `${(R.stamina / R.maxStamina) * 100}%`;
         rightStateEl.textContent = R.getStateLabel();
+
+        const labels = {
+            AGGRESSIVE: '🔥 BASTIR!',
+            DEFENSIVE: '🛡️ SAVUNMA!',
+            MORALE: '🍷 MORAL VER!'
+        };
+        Object.keys(tacticBtns).forEach(k => {
+            const cd = currentArena.tacticCooldowns[k];
+            const btn = tacticBtns[k];
+            if (currentArena.matchEnded) {
+                btn.disabled = true;
+                btn.textContent = labels[k];
+            } else if (cd > 0) {
+                btn.disabled = true;
+                btn.textContent = `${labels[k]} (${Math.ceil(cd)}sn)`;
+            } else {
+                btn.disabled = false;
+                btn.textContent = labels[k];
+            }
+        });
     });
 
     function renderAll() {
@@ -461,7 +541,32 @@
         else if (activeTab === 'arena') renderArenaTab();
     }
 
-    // Event Bağlantıları
+    // TEST / GELİŞTİRİCİ PANELİ
+    document.getElementById('btn-toggle-dev').addEventListener('click', () => {
+        devPanel.classList.toggle('hidden');
+    });
+    document.getElementById('dev-add-gold').addEventListener('click', () => {
+        ludus.devAddGold(500);
+        showToast('🛠️ Test: +500 Altın eklendi!');
+        renderAll();
+    });
+    document.getElementById('dev-add-fame').addEventListener('click', () => {
+        ludus.devAddFame(25);
+        showToast('🛠️ Test: +25 Şöhret eklendi!');
+        renderAll();
+    });
+    document.getElementById('dev-boss-day').addEventListener('click', () => {
+        if (matchInProgress) return;
+        ludus.devJumpToBossDay();
+        showToast(`👑 Test: Gün ${ludus.state.day} (BOSS GÜNÜ) açıldı! Arena sekmesine bak.`);
+        renderAll();
+    });
+    document.getElementById('dev-heal-all').addEventListener('click', () => {
+        ludus.devHealAll();
+        showToast('💚 Test: Tüm kadro iyileştirildi!');
+        renderAll();
+    });
+
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => switchTab(btn.dataset.tab));
     });
@@ -469,7 +574,8 @@
     document.getElementById('btn-next-day').addEventListener('click', () => {
         if (matchInProgress) return;
         ludus.nextDay();
-        showToast(`Gün ${ludus.state.day} başladı! Kadro dinlendi ve yeni rakipler geldi.`);
+        const isBoss = ludus.state.day % 5 === 0;
+        showToast(isBoss ? `👑 Gün ${ludus.state.day}: ŞAMPİYONA BOSS GÜNÜ!` : `Gün ${ludus.state.day} başladı!`);
         renderAll();
     });
 
@@ -491,7 +597,6 @@
         e.target.textContent = Game.SoundFX.enabled ? '🔊 Ses' : '🔇 Sessiz';
     });
 
-    // Save / Load / Reset
     document.getElementById('btn-export-save').addEventListener('click', () => {
         const blob = new Blob([ludus.exportSaveJSON()], { type: 'application/json' });
         const url = URL.createObjectURL(blob);

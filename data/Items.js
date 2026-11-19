@@ -15,7 +15,8 @@
             critBonus: 0.16,
             armorPen: 0.25,
             weight: 1,
-            desc: 'Çok hızlı, yüksek kritik, kısa menzil'
+            effect: { type: 'bleed', chance: 0.35, duration: 4.0 },
+            desc: 'Çok hızlı • %35 Kanama (4sn)'
         },
         sword: {
             id: 'sword',
@@ -32,7 +33,8 @@
             critBonus: 0.06,
             armorPen: 0.10,
             weight: 3,
-            desc: 'Dengeli hız, hasar ve menzil'
+            effect: { type: 'lifestam', chance: 1.0, amount: 6 },
+            desc: 'Dengeli • Vuruşta +6 Stamina yeniler'
         },
         spear: {
             id: 'spear',
@@ -49,7 +51,8 @@
             critBonus: 0.07,
             armorPen: 0.25,
             weight: 4,
-            desc: 'Uzun menzil, mesafeci dövüş'
+            effect: { type: 'pierce', chance: 0.30, bonusDmg: 4 },
+            desc: 'Uzun menzil • %30 Delici (+4 Hasar)'
         },
         trident: {
             id: 'trident',
@@ -66,7 +69,8 @@
             critBonus: 0.10,
             armorPen: 0.15,
             weight: 5,
-            desc: 'Güçlü orta-uzun menzil'
+            effect: { type: 'slow', chance: 0.40, duration: 3.5 },
+            desc: 'Orta-uzun menzil • %40 Yavaşlatma'
         },
         mace: {
             id: 'mace',
@@ -83,7 +87,8 @@
             critBonus: 0.04,
             armorPen: 0.60,
             weight: 6,
-            desc: 'Zırhın %60\'ını deler, tank kırıcı'
+            effect: { type: 'stun', chance: 0.30, duration: 1.1 },
+            desc: '%60 Zırh Delme • %30 Sersemletme'
         },
         axe: {
             id: 'axe',
@@ -100,7 +105,8 @@
             critBonus: 0.08,
             armorPen: 0.35,
             weight: 8,
-            desc: 'Çok ağır hasar, yavaş savurma'
+            effect: { type: 'armorBreak', chance: 0.35, duration: 5.0 },
+            desc: 'Ağır hasar • %35 Zırh Kırma (-5)'
         }
     };
 
@@ -145,7 +151,8 @@
             weight: 7,
             shape: 'rect',
             color: '#9e2a2b',
-            desc: '%68 blok şansı, ağır koruma'
+            effect: { type: 'thorns', dmg: 4 },
+            desc: '%68 blok • Blokta 4 Diken Hasarı'
         }
     };
 

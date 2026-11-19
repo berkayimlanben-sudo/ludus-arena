@@ -346,3 +346,115 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .log-title { font-size: 12px; font-weight: 700; color: #e6b85c; margin-bottom: 6px; }
 .battle-log { height: 90px; overflow-y: auto; font-size: 13px; color: #d6c8b4; display: flex; flex-direction: column; gap: 4px; }
 .log-line { border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 2px; }
+
+/* FAZ 4A EK STİLLERİ */
+.ludus-stage-wrap {
+    border: 2px solid #594632;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #14110e;
+}
+
+#ludus-canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 960 / 260;
+    cursor: pointer;
+}
+
+.stage-hint {
+    background: #1a1511;
+    color: #b8a58d;
+    font-size: 11px;
+    padding: 5px 10px;
+    text-align: center;
+    border-top: 1px solid #382c20;
+}
+
+.rc-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.trait-badge {
+    font-size: 10px;
+    background: #2b231b;
+    border: 1px solid #8a6d3b;
+    color: #ffd166;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.injury-badge {
+    font-size: 10px;
+    background: #4a1818;
+    border: 1px solid #c83e37;
+    color: #ffb3b3;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.injured-txt {
+    color: #ff6b6b;
+}
+
+.tactic-bar {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.tactic-btn {
+    padding: 10px;
+    font-weight: 800;
+    font-size: 13px;
+    border-radius: 6px;
+    transition: transform 0.08s;
+}
+
+.tactic-btn:active:not(:disabled) { transform: scale(0.97); }
+.tactic-btn.agg { background: #5c1c1c; border-color: #c83e37; color: #ffd8d8; }
+.tactic-btn.def { background: #1d3557; border-color: #457b9d; color: #d8ebff; }
+.tactic-btn.mor { background: #4a3714; border-color: #d4af37; color: #ffe8a3; }
+/* FAZ 4B TEST PANELİ & BOSS KARTLARI */
+.dev-toggle-btn {
+    background: #2b2038;
+    border-color: #7048e8;
+    color: #d0bfff;
+    font-weight: 700;
+}
+
+.dev-panel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    background: #1c1626;
+    border: 1px dashed #7048e8;
+    padding: 8px 12px;
+    border-radius: 8px;
+}
+
+.dev-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #d0bfff;
+    margin-right: 4px;
+}
+
+.opp-card.boss-card {
+    border: 2px solid #d4af37;
+    background: linear-gradient(180deg, #241614 0%, #14110e 100%);
+    box-shadow: 0 0 16px rgba(212, 175, 55, 0.18);
+}
+
+.badge.boss-badge {
+    background: #9e2a2b;
+    color: #ffd166;
+    border: 1px solid #d4af37;
+}
