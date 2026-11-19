@@ -54,19 +54,21 @@
                 }
             }
 
-            // Çizim
-            const w = this.canvas.width;
-            const h = this.canvas.height;
-            this.ctx.clearRect(0, 0, w, h);
+            // Çizim (yalnızca görünür canvaslarda çiz)
+            if (!this.canvas || this.canvas.offsetParent !== null) {
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+                this.ctx.clearRect(0, 0, w, h);
 
-            if (this.activeCamera) {
-                this.activeCamera.applyTransform(this.ctx, w, h);
-            }
+                if (this.activeCamera) {
+                    this.activeCamera.applyTransform(this.ctx, w, h);
+                }
 
-            this.root._propagateDraw(this.ctx);
+                this.root._propagateDraw(this.ctx);
 
-            if (this.activeCamera) {
-                this.activeCamera.restoreTransform(this.ctx);
+                if (this.activeCamera) {
+                    this.activeCamera.restoreTransform(this.ctx);
+                }
             }
 
             this.onFrameUpdate.emit(rawDelta);

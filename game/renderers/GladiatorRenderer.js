@@ -124,6 +124,22 @@
                 ctx.arc(0, -35, 22, 0, Math.PI * 2);
                 ctx.stroke();
             }
+            if (effects.poison > 0) {
+                const pulse = performance.now() * 0.006;
+                ctx.strokeStyle = 'rgba(81, 207, 102, 0.65)';
+                ctx.lineWidth = 1.8;
+                ctx.beginPath();
+                ctx.ellipse(0, -36, 19, 28, 0, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = '#51cf66';
+                for (let i = 0; i < 3; i++) {
+                    const bx = Math.sin(pulse + i * 2.1) * 14;
+                    const by = -20 - ((pulse * 18 + i * 18) % 44);
+                    ctx.beginPath();
+                    ctx.arc(bx, by, 2.2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
 
             ctx.restore();
         }

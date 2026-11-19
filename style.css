@@ -671,3 +671,247 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
     font-size: 12px;
     font-weight: 700;
 }
+
+/* FAZ 7 EK STİLLERİ (TÜKETİLEBİLİRLER, DOCTORE & OLAY KARTLARI) */
+.doctore-banner {
+    background: linear-gradient(180deg, #2b2113 0%, #17120c 100%);
+    border: 1px solid #d4af37;
+    border-radius: 6px;
+    padding: 9px 10px;
+    margin-bottom: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+}
+
+.doctore-banner strong {
+    color: #ffd166;
+    font-size: 13px;
+}
+
+.doctore-banner span {
+    color: #d6c8b4;
+    font-size: 11px;
+}
+
+.detail-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-end;
+}
+
+.doctore-btn {
+    background: #423010;
+    border-color: #d4af37;
+    color: #ffd166;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.doctore-btn:hover:not(:disabled) {
+    background: #594115;
+}
+
+.doctore-progress {
+    font-size: 11px;
+    color: #b8a58d;
+}
+
+.event-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 6, 5, 0.82);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 100;
+}
+
+.event-modal-card {
+    width: 100%;
+    max-width: 520px;
+    background: linear-gradient(180deg, #241c14 0%, #14100c 100%);
+    border: 2px solid #d4af37;
+    border-radius: 10px;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+}
+
+.event-modal-kicker {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: #d4af37;
+}
+
+.event-modal-card h3 {
+    font-size: 19px;
+    color: #f3ead8;
+}
+
+.event-modal-card p {
+    font-size: 13px;
+    color: #cbb89d;
+    line-height: 1.45;
+}
+
+.event-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.event-choice-btn {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    text-align: left;
+    padding: 10px 12px;
+    background: #1b1510;
+    border: 1px solid #6b5336;
+}
+
+.event-choice-btn:hover:not(:disabled) {
+    background: #2b2219;
+    border-color: #ffd166;
+}
+
+.event-choice-btn strong {
+    font-size: 13px;
+    color: #ffd166;
+}
+
+.event-choice-btn span {
+    font-size: 11px;
+    color: #cbb89d;
+}
+
+.bag-consumables-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: #142218;
+    border: 1px solid #2b8a3e;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 12px;
+}
+
+.bag-cons-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
+}
+
+.bag-cons-info strong {
+    color: #69db7c;
+}
+
+.bag-cons-info span {
+    font-size: 11px;
+    color: #cbb89d;
+}
+
+.bag-cons-btn {
+    background: #1d3c27;
+    border-color: #37b24d;
+    color: #b2f2bb;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.bag-cons-btn:hover {
+    background: #254f32;
+}
+
+.consumable-pick-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+}
+
+.consumable-pick-wrap.has-items {
+    background: rgba(43, 138, 62, 0.14);
+    border-color: #2b8a3e;
+}
+
+.consumable-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.consumable-empty-hint {
+    font-size: 11px;
+    color: #9e8f7b;
+}
+
+.consumable-chip {
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #1c1814;
+    border: 1px solid #4a3d2f;
+    color: #d6c8b4;
+    border-radius: 6px;
+}
+
+.consumable-chip.active {
+    background: #1f4228;
+    border-color: #51cf66;
+    color: #ebfbee;
+}
+
+.confirm-modal-card {
+    border-color: #c92a2a;
+}
+
+.confirm-kicker {
+    color: #ff8787;
+}
+
+.confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.cancel-confirm-btn {
+    background: #221c16;
+    border: 1px solid #5c4b37;
+    color: #e6d8c3;
+    padding: 8px 14px;
+    font-weight: 600;
+}
+
+.cancel-confirm-btn:hover {
+    background: #2f261e;
+}
+
+.danger-confirm-btn {
+    background: #7c1818;
+    border: 1px solid #e03131;
+    color: #fff5f5;
+    padding: 8px 16px;
+    font-weight: 700;
+}
+
+.danger-confirm-btn:hover {
+    background: #9c2020;
+}

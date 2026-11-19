@@ -36,7 +36,8 @@
                     weapons: { dagger: 1 },
                     shields: { parma: 1 },
                     armors: { leather: 1 },
-                    helmets: { galea: 1 }
+                    helmets: { galea: 1 },
+                    consumables: { poison: 0, net: 0, potion: 0 }
                 },
                 roster: [
                     this._createGladiator({
@@ -52,6 +53,10 @@
                     })
                 ],
                 selectedGladiatorId: null,
+                doctore: null,
+                lastEventDay: 1,
+                lastEventId: null,
+                pendingEvent: null,
                 marketRecruits: [],
                 dailyOpponents: []
             };
@@ -62,6 +67,19 @@
 
         _migrateState() {
             if (!this.state) return;
+            if (!this.state.inventory) this.state.inventory = {};
+            if (!this.state.inventory.weapons) this.state.inventory.weapons = {};
+            if (!this.state.inventory.shields) this.state.inventory.shields = {};
+            if (!this.state.inventory.armors) this.state.inventory.armors = {};
+            if (!this.state.inventory.helmets) this.state.inventory.helmets = {};
+            if (!this.state.inventory.consumables) {
+                this.state.inventory.consumables = { poison: 0, net: 0, potion: 0 };
+            }
+            if (this.state.doctore === undefined) this.state.doctore = null;
+            if (this.state.lastEventDay === undefined) this.state.lastEventDay = this.state.day || 1;
+            if (this.state.lastEventId === undefined) this.state.lastEventId = null;
+            if (this.state.pendingEvent === undefined) this.state.pendingEvent = null;
+
             const ensureGlad = (obj) => {
                 if (!obj.traitId) obj.traitId = pickRandomKey(Data.TRAITS);
                 if (!obj.styleId) obj.styleId = 'balanced';
@@ -72,6 +90,8 @@
                 if (obj.xpToNext === undefined) obj.xpToNext = 100 + (obj.level - 1) * 60;
                 if (!Array.isArray(obj.perks)) obj.perks = [];
                 if (obj.pendingPerkChoices === undefined) obj.pendingPerkChoices = null;
+                if (obj.wins === undefined) obj.wins = 0;
+                if (obj.losses === undefined) obj.losses = 0;
             };
             (this.state.roster || []).forEach(ensureGlad);
             (this.state.marketRecruits || []).forEach(ensureGlad);
@@ -377,7 +397,10 @@
         // --- XP, SEVİYE VE PERK SİSTEMİ ---
         grantXp(g, amount) {
             if (!g) return false;
-            g.xp += amount;
+            const effectiveXp = Game.Phase7Rules
+                ? Game.Phase7Rules.computeEffectiveXp(amount, this.state.doctore)
+                : amount;
+            g.xp += effectiveXp;
             let leveledUp = false;
 
             while (g.xp >= g.xpToNext) {
@@ -470,10 +493,33 @@
             this.saveToLocalStorage();
         }
 
+        devGrantWins(gladiatorId, count = 10) {
+            const g = this.state.roster.find(x => x.id === gladiatorId) || this.getSelectedGladiator();
+            if (!g) return false;
+            g.wins = (g.wins || 0) + count;
+            this.saveToLocalStorage();
+            return true;
+        }
+
+        devTriggerEvent() {
+            if (!Game.Phase7Rules || !Data.ROMAN_EVENTS) return null;
+            const ev = Game.Phase7Rules.pickRomanEvent(Data.ROMAN_EVENTS, this.state.lastEventId);
+            if (ev) {
+                this.state.pendingEvent = ev;
+                this.state.lastEventId = ev.id;
+                this.state.lastEventDay = this.state.day;
+                this.saveToLocalStorage();
+            }
+            return ev;
+        }
+
         getTrainingCost(g, statKey) {
             const cur = g.stats[statKey];
             const lvl = this.state.buildings.trainingYard;
-            const discount = 1 - (lvl - 1) * 0.10;
+            const docDiscount = Game.Phase7Rules
+                ? Game.Phase7Rules.getDoctoreBonuses(this.state.doctore).trainingDiscount
+                : 0;
+            const discount = Math.max(0.45, 1 - (lvl - 1) * 0.10 - docDiscount);
             return Math.max(12, Math.round((20 + (cur - 7) * 7) * discount));
         }
 
@@ -525,17 +571,67 @@
         }
 
         buyItem(categoryKey, itemId) {
-            const dictMap = { weapons: Data.WEAPONS, shields: Data.SHIELDS, armors: Data.ARMORS, helmets: Data.HELMETS };
-            const item = dictMap[categoryKey][itemId];
+            const dictMap = {
+                weapons: Data.WEAPONS,
+                shields: Data.SHIELDS,
+                armors: Data.ARMORS,
+                helmets: Data.HELMETS,
+                consumables: Data.CONSUMABLES
+            };
+            const dict = dictMap[categoryKey];
+            const item = dict ? dict[itemId] : null;
             if (!item) return { ok: false };
             if (item.tier > this.state.buildings.blacksmith) return { ok: false, msg: `Demirci Seviye ${item.tier} gerekiyor!` };
             if (this.state.gold < item.price) return { ok: false, msg: 'Yeterli altın yok!' };
 
             this.state.gold -= item.price;
+            if (!this.state.inventory[categoryKey]) this.state.inventory[categoryKey] = {};
             const inv = this.state.inventory[categoryKey];
             inv[itemId] = (inv[itemId] || 0) + 1;
             this.saveToLocalStorage();
             return { ok: true };
+        }
+
+        consumeArenaItem(consumableId) {
+            if (!consumableId || consumableId === 'none') return null;
+            const inv = this.state.inventory.consumables || {};
+            if (!inv[consumableId] || inv[consumableId] <= 0) return null;
+            inv[consumableId] -= 1;
+            this.saveToLocalStorage();
+            return Data.CONSUMABLES[consumableId] || null;
+        }
+
+        retireAsDoctore(gladiatorId) {
+            const idx = this.state.roster.findIndex(x => x.id === gladiatorId);
+            const g = idx !== -1 ? this.state.roster[idx] : null;
+            const check = Game.Phase7Rules
+                ? Game.Phase7Rules.canRetireAsDoctore(g, this.state.roster.length)
+                : { ok: false, msg: 'Özellik yüklenemedi.' };
+            if (!check.ok) return check;
+
+            // Emekli edilen gladyatörün ekipmanını envantere geri al
+            if (g.weaponId) {
+                this.state.inventory.weapons[g.weaponId] = (this.state.inventory.weapons[g.weaponId] || 0) + 1;
+            }
+            if (g.shieldId && g.shieldId !== 'none') {
+                this.state.inventory.shields[g.shieldId] = (this.state.inventory.shields[g.shieldId] || 0) + 1;
+            }
+            if (g.armorId && g.armorId !== 'tunic') {
+                this.state.inventory.armors[g.armorId] = (this.state.inventory.armors[g.armorId] || 0) + 1;
+            }
+            if (g.helmetId && g.helmetId !== 'none') {
+                this.state.inventory.helmets[g.helmetId] = (this.state.inventory.helmets[g.helmetId] || 0) + 1;
+            }
+
+            this.state.doctore = Game.Phase7Rules.createDoctoreRecord(g, this.state.day);
+            this.state.roster.splice(idx, 1);
+
+            if (!this.state.roster.some(r => r.id === this.state.selectedGladiatorId)) {
+                this.state.selectedGladiatorId = this.state.roster[0] ? this.state.roster[0].id : null;
+            }
+
+            this.saveToLocalStorage();
+            return { ok: true, doctore: this.state.doctore };
         }
 
         equipItem(gladiatorId, categoryKey, itemId) {
@@ -573,12 +669,22 @@
             this.state.gold -= rec.price;
             rec.hired = true;
 
+            const docBonus = Game.Phase7Rules
+                ? Game.Phase7Rules.getDoctoreBonuses(this.state.doctore).statBonus
+                : 0;
+            const stats = Object.assign({}, rec.stats);
+            if (docBonus > 0) {
+                stats.strength += docBonus;
+                stats.agility += docBonus;
+                stats.vitality += docBonus;
+            }
+
             const newGlad = this._createGladiator({
                 name: rec.name,
                 origin: rec.origin,
                 skinColor: rec.skinColor,
                 traitId: rec.traitId,
-                stats: Object.assign({}, rec.stats),
+                stats,
                 weaponId: rec.weaponId,
                 shieldId: rec.shieldId,
                 armorId: rec.armorId,
@@ -587,7 +693,7 @@
             this.state.roster.push(newGlad);
             this.state.selectedGladiatorId = newGlad.id;
             this.saveToLocalStorage();
-            return { ok: true };
+            return { ok: true, docBonus };
         }
 
         getBuildingUpgradeCost(buildingId) {
@@ -630,8 +736,41 @@
             }
 
             this.refreshDailyEvents();
+
+            let eventTriggered = false;
+            if (!this.state.pendingEvent && Game.Phase7Rules && Data.ROMAN_EVENTS) {
+                if (Game.Phase7Rules.shouldTriggerRomanEvent(this.state.day, this.state.lastEventDay)) {
+                    const ev = Game.Phase7Rules.pickRomanEvent(Data.ROMAN_EVENTS, this.state.lastEventId);
+                    if (ev) {
+                        this.state.pendingEvent = ev;
+                        this.state.lastEventId = ev.id;
+                        this.state.lastEventDay = this.state.day;
+                        eventTriggered = true;
+                    }
+                }
+            }
+
             this.saveToLocalStorage();
-            return { upkeep, starved };
+            return { upkeep, starved, eventTriggered };
+        }
+
+        resolveRomanEvent(choiceId) {
+            if (!this.state.pendingEvent || !Game.Phase7Rules) {
+                return { ok: false, msg: 'Bekleyen olay yok.' };
+            }
+            const res = Game.Phase7Rules.resolveRomanEventChoice(
+                this.state.pendingEvent,
+                choiceId,
+                this.state,
+                {
+                    grantXp: (g, amt) => this.grantXp(g, amt),
+                    getMaxHp: (g) => this.getGladiatorMaxHp(g)
+                }
+            );
+            if (!res.ok) return res;
+            this.state.pendingEvent = null;
+            this.saveToLocalStorage();
+            return res;
         }
 
         recordTeamMatchResult(gladiatorIds, opponentId, didWin, remainingHps) {
@@ -693,9 +832,12 @@
             });
 
             if (this.state.roster.length === 0 && this.state.gold < 75) {
+                const docBonus = Game.Phase7Rules
+                    ? Game.Phase7Rules.getDoctoreBonuses(this.state.doctore).statBonus
+                    : 0;
                 const rookie = this._createGladiator({
                     name: 'Çaylak ' + pickRandom(Data.GLADIATOR_NAMES),
-                    stats: { strength: 8, agility: 8, vitality: 9 },
+                    stats: { strength: 8 + docBonus, agility: 8 + docBonus, vitality: 9 + docBonus },
                     weaponId: 'dagger',
                     armorId: 'tunic'
                 });

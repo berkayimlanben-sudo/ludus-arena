@@ -36,8 +36,9 @@
             const rightList = Array.isArray(this.rightConfig) ? this.rightConfig : [this.rightConfig];
 
             leftList.forEach((cfg, idx) => {
+                const laneY = Game.CombatRules ? Game.CombatRules.getLaneY(idx, leftList.length) : 355;
                 const full = Object.assign({
-                    x: 270 - idx * 75, y: 355, team: 'left',
+                    x: 270 - idx * 75, y: laneY, groundY: laneY, team: 'left',
                     teamColor: idx === 0 ? '#c83e37' : '#8f241f',
                     weapon: Data.WEAPONS.sword, shield: Data.SHIELDS.scutum,
                     armor: Data.ARMORS.leather, helmet: Data.HELMETS.galea
@@ -49,8 +50,9 @@
             });
 
             rightList.forEach((cfg, idx) => {
+                const laneY = Game.CombatRules ? Game.CombatRules.getLaneY(idx, rightList.length) : 355;
                 const full = Object.assign({
-                    x: 690 + idx * 75, y: 355, team: 'right',
+                    x: 690 + idx * 75, y: laneY, groundY: laneY, team: 'right',
                     teamColor: idx === 0 ? '#2c6eb5' : '#1b497a',
                     weapon: Data.WEAPONS.spear, shield: Data.SHIELDS.none,
                     armor: Data.ARMORS.tunic, helmet: Data.HELMETS.corinthian
@@ -89,6 +91,9 @@
             });
 
             this.addChild(this.particles);
+            if (Game.CombatRules) {
+                this.children = Game.CombatRules.sortArenaChildren(this.children, this.camera, this.particles);
+            }
 
             const lNames = this.leftTeam.map(f => f.gladiatorName).join(' & ');
             const rNames = this.rightTeam.map(f => f.gladiatorName).join(' & ');
@@ -162,6 +167,10 @@
                 const maxX = 960 - minX;
                 this.camera.targetX = Math.max(minX, Math.min(maxX, midX));
                 this.camera.targetY = targetZoom > 1.05 ? 265 : 235;
+            }
+
+            if (Game.CombatRules) {
+                this.children = Game.CombatRules.sortArenaChildren(this.children, this.camera, this.particles);
             }
         }
 

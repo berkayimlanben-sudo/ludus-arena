@@ -30,9 +30,63 @@
     const arenaPrepView = document.getElementById('arena-prep-view');
     const arenaCombatView = document.getElementById('arena-combat-view');
     const arenaFighterSelect = document.getElementById('arena-fighter-select');
+    const arenaConsumableWrap = document.getElementById('arena-consumable-wrap');
+    const arenaConsumableSelect = document.getElementById('arena-consumable-select');
+    const arenaConsumableChips = document.getElementById('arena-consumable-chips');
     const arenaFighter2Wrap = document.getElementById('arena-fighter-2-wrap');
     const arenaFighterSelect2 = document.getElementById('arena-fighter-select-2');
+    const arenaConsumable2Wrap = document.getElementById('arena-consumable-2-wrap');
+    const arenaConsumableSelect2 = document.getElementById('arena-consumable-select-2');
     const arenaOpponentsList = document.getElementById('arena-opponents-list');
+
+    const doctoreBanner = document.getElementById('doctore-banner');
+    const romanEventModal = document.getElementById('roman-event-modal');
+    const eventModalTitle = document.getElementById('event-modal-title');
+    const eventModalDesc = document.getElementById('event-modal-desc');
+    const eventModalChoices = document.getElementById('event-modal-choices');
+
+    const confirmModal = document.getElementById('confirm-modal');
+    const confirmModalKicker = document.getElementById('confirm-modal-kicker');
+    const confirmModalTitle = document.getElementById('confirm-modal-title');
+    const confirmModalDesc = document.getElementById('confirm-modal-desc');
+    const confirmModalCancel = document.getElementById('confirm-modal-cancel');
+    const confirmModalOk = document.getElementById('confirm-modal-ok');
+    let pendingConfirmAction = null;
+
+    function closeConfirmModal() {
+        pendingConfirmAction = null;
+        if (confirmModal) confirmModal.classList.add('hidden');
+    }
+
+    function openConfirmModal({ kicker, title, desc, confirmLabel = 'Onayla', cancelLabel = 'Vazgeç', onConfirm }) {
+        if (!confirmModal) {
+            if (onConfirm) onConfirm();
+            return;
+        }
+        confirmModalKicker.textContent = kicker || '⚠️ ONAY';
+        confirmModalTitle.textContent = title || 'Emin misin?';
+        confirmModalDesc.textContent = desc || '';
+        confirmModalOk.textContent = confirmLabel;
+        confirmModalCancel.textContent = cancelLabel;
+        pendingConfirmAction = onConfirm || null;
+        confirmModal.classList.remove('hidden');
+    }
+
+    if (confirmModalCancel) {
+        confirmModalCancel.addEventListener('click', closeConfirmModal);
+    }
+    if (confirmModalOk) {
+        confirmModalOk.addEventListener('click', () => {
+            const action = pendingConfirmAction;
+            closeConfirmModal();
+            if (action) action();
+        });
+    }
+    if (confirmModal) {
+        confirmModal.addEventListener('click', (e) => {
+            if (e.target === confirmModal) closeConfirmModal();
+        });
+    }
 
     const leftNameEl = document.getElementById('left-name');
     const leftGearEl = document.getElementById('left-gear');
@@ -116,6 +170,18 @@
         const rosterEl = document.getElementById('roster-list');
         const detailEl = document.getElementById('selected-gladiator-panel');
         const buildingsEl = document.getElementById('buildings-list');
+
+        const doc = ludus.state.doctore;
+        if (doc) {
+            doctoreBanner.classList.remove('hidden');
+            doctoreBanner.innerHTML = `
+                <strong>🏛️ Baş Eğitmen (Doctore): ${doc.name} (${doc.wins}G)</strong>
+                <span>Yeni çaylaklara +${doc.statBonus} Tüm Statlar • +%${doc.xpBonusPct} XP • -%${Math.round((doc.trainingDiscount || 0.1) * 100)} Eğitim Ücreti</span>
+            `;
+        } else {
+            doctoreBanner.classList.add('hidden');
+            doctoreBanner.innerHTML = '';
+        }
 
         rosterEl.innerHTML = '';
         ludus.state.roster.forEach(g => {
@@ -239,9 +305,14 @@
                         </div>
                         <div class="summary-line">Can: ${sel.currentHp}/${sum.maxHp} | Zırh: ${sum.def} | Hız: ${sum.spd} | Ağırlık: ${sum.weight}</div>
                     </div>
-                    <button id="btn-heal-glad" class="heal-btn" ${healCost === 0 ? 'disabled' : ''}>
-                        ${healCost === 0 ? '💚 Sağlıklı' : `🩹 İyileştir (🪙${healCost})`}
-                    </button>
+                    <div class="detail-actions">
+                        <button id="btn-heal-glad" class="heal-btn" ${healCost === 0 ? 'disabled' : ''}>
+                            ${healCost === 0 ? '💚 Sağlıklı' : `🩹 İyileştir (🪙${healCost})`}
+                        </button>
+                        ${(sel.wins || 0) >= 10
+                            ? `<button id="btn-retire-doctore" class="doctore-btn" ${ludus.state.roster.length < 2 ? 'disabled title="En az 2 gladyatör gerekir"' : ''}>🏛️ Doctore Yap</button>`
+                            : `<span class="doctore-progress">🏛️ Doctore için Zafer: ${sel.wins || 0}/10</span>`}
+                    </div>
                 </div>
 
                 ${perkChoiceHTML}
@@ -259,6 +330,22 @@
                     ${renderEquipSelect('Zırh', 'armors', Data.ARMORS, sel.armorId)}
                     ${renderEquipSelect('Miğfer', 'helmets', Data.HELMETS, sel.helmetId)}
                 </div>
+
+                ${(() => {
+                    const invCons = ludus.state.inventory.consumables || {};
+                    const ownedCons = Object.values(Data.CONSUMABLES || {}).filter(c => (invCons[c.id] || 0) > 0);
+                    if (ownedCons.length === 0) return '';
+                    const itemsText = ownedCons.map(c => `${c.name} ×${invCons[c.id]}`).join(' • ');
+                    return `
+                        <div class="bag-consumables-bar">
+                            <div class="bag-cons-info">
+                                <strong>🧪 Çantadaki Maç Eşyaları:</strong>
+                                <span>${itemsText} — <em>Maça girerken Arena sekmesinden seçilir</em></span>
+                            </div>
+                            <button id="btn-go-arena-cons" class="bag-cons-btn">⚔️ Arena'da Seç</button>
+                        </div>
+                    `;
+                })()}
 
                 <div class="train-grid">
                     ${statRow('strength', 'Güç')}
@@ -312,6 +399,24 @@
                     renderAll();
                 });
             }
+
+            const doctoreBtn = document.getElementById('btn-retire-doctore');
+            if (doctoreBtn) {
+                doctoreBtn.addEventListener('click', () => {
+                    const res = ludus.retireAsDoctore(sel.id);
+                    if (!res.ok) {
+                        showToast(res.msg || 'Emekli edilemedi.', true);
+                    } else {
+                        showToast(`🏛️ ${res.doctore.name} artık Ludus Baş Eğitmeni (Doctore)!`);
+                    }
+                    renderAll();
+                });
+            }
+
+            const goArenaConsBtn = document.getElementById('btn-go-arena-cons');
+            if (goArenaConsBtn) {
+                goArenaConsBtn.addEventListener('click', () => switchTab('arena'));
+            }
         }
 
         buildingsEl.innerHTML = '';
@@ -348,7 +453,8 @@
             { title: '⚔️ Silahlar', key: 'weapons', dict: Data.WEAPONS },
             { title: '🛡️ Kalkanlar', key: 'shields', dict: Data.SHIELDS },
             { title: '🦺 Zırhlar', key: 'armors', dict: Data.ARMORS },
-            { title: '🪖 Miğferler', key: 'helmets', dict: Data.HELMETS }
+            { title: '🪖 Miğferler', key: 'helmets', dict: Data.HELMETS },
+            { title: '🧪 Arena Tüketilebilirleri (Arena sekmesinde maça girerken seçilir)', key: 'consumables', dict: Data.CONSUMABLES }
         ];
 
         sections.forEach(sec => {
@@ -360,7 +466,8 @@
             Object.values(sec.dict).forEach(item => {
                 if (item.price === 0) return;
                 const locked = item.tier > smithLvl;
-                const ownedCount = ludus.state.inventory[sec.key][item.id] || 0;
+                const ownedCount = (ludus.state.inventory[sec.key] && ludus.state.inventory[sec.key][item.id]) || 0;
+                const metaInfo = sec.key === 'consumables' ? 'Maç öncesi Arena\'da seçilir' : `Ağr: ${item.weight}`;
 
                 const card = document.createElement('div');
                 card.className = `shop-card ${locked ? 'locked' : ''}`;
@@ -369,7 +476,7 @@
                         <strong>${item.name}</strong>
                         <span class="badge">Sv.${item.tier}</span>
                     </div>
-                    <div class="sc-desc">${item.desc} • Ağr: ${item.weight}</div>
+                    <div class="sc-desc">${item.desc} • ${metaInfo}</div>
                     <div class="sc-bot">
                         <span class="owned-txt">Çantada: ${ownedCount}</span>
                         <button class="buy-btn" ${locked ? 'disabled' : ''}>
@@ -380,7 +487,11 @@
                 card.querySelector('.buy-btn').addEventListener('click', () => {
                     const res = ludus.buyItem(sec.key, item.id);
                     if (!res.ok) showToast(res.msg, true);
-                    else showToast(`${item.name} satın alındı!`);
+                    else if (sec.key === 'consumables') {
+                        showToast(`${item.name} çantada! Arena sekmesinden "Maç Eşyası" olarak seçip kullanabilirsin.`);
+                    } else {
+                        showToast(`${item.name} satın alındı!`);
+                    }
                     renderAll();
                 });
                 grid.appendChild(card);
@@ -431,6 +542,7 @@
 
         const has2v2Today = ludus.state.dailyOpponents.some(o => o.ruleId === 'team_2v2' && !o.completed);
         arenaFighter2Wrap.classList.toggle('hidden', !has2v2Today);
+        arenaConsumable2Wrap.classList.toggle('hidden', !has2v2Today);
 
         const fillSelect = (selEl, defaultIdx) => {
             const prevVal = selEl.value;
@@ -459,6 +571,61 @@
         arenaFighterSelect.onchange = () => {
             ludus.state.selectedGladiatorId = arenaFighterSelect.value;
         };
+
+        const fillConsumableSelect = (selEl) => {
+            const prev = selEl.value;
+            const inv = ludus.state.inventory.consumables || {};
+            selEl.innerHTML = '<option value="none">Eşya Yok</option>';
+            Object.values(Data.CONSUMABLES || {}).forEach(item => {
+                const count = inv[item.id] || 0;
+                if (count > 0) {
+                    const opt = document.createElement('option');
+                    opt.value = item.id;
+                    opt.textContent = `${item.name} (Çantada: ${count})`;
+                    if (prev === item.id) opt.selected = true;
+                    selEl.appendChild(opt);
+                }
+            });
+        };
+        fillConsumableSelect(arenaConsumableSelect);
+        fillConsumableSelect(arenaConsumableSelect2);
+
+        const renderConsumableChips = () => {
+            const inv = ludus.state.inventory.consumables || {};
+            const owned = Object.values(Data.CONSUMABLES || {}).filter(item => (inv[item.id] || 0) > 0);
+            if (arenaConsumableWrap) {
+                arenaConsumableWrap.classList.toggle('has-items', owned.length > 0);
+            }
+            if (!arenaConsumableChips) return;
+            arenaConsumableChips.innerHTML = '';
+            if (owned.length === 0) {
+                const hint = document.createElement('span');
+                hint.className = 'consumable-empty-hint';
+                hint.textContent = 'Çantada maç eşyası yok (Demirci’den alabilirsin)';
+                arenaConsumableChips.appendChild(hint);
+                return;
+            }
+
+            const makeChip = (val, label) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `consumable-chip ${arenaConsumableSelect.value === val ? 'active' : ''}`;
+                btn.textContent = label;
+                btn.addEventListener('click', () => {
+                    arenaConsumableSelect.value = val;
+                    renderConsumableChips();
+                });
+                return btn;
+            };
+
+            arenaConsumableChips.appendChild(makeChip('none', 'Kullanma'));
+            owned.forEach(item => {
+                arenaConsumableChips.appendChild(makeChip(item.id, `${item.name} (×${inv[item.id]})`));
+            });
+        };
+
+        arenaConsumableSelect.onchange = renderConsumableChips;
+        renderConsumableChips();
 
         arenaOpponentsList.innerHTML = '';
         ludus.state.dailyOpponents.forEach(opp => {
@@ -532,7 +699,7 @@
         }
     }
 
-    function toGladiatorConfig(g, isBoss = false) {
+    function toGladiatorConfig(g, isBoss = false, consumable = null) {
         return {
             name: g.name,
             skinColor: g.skinColor,
@@ -547,7 +714,8 @@
             weapon: Data.WEAPONS[g.weaponId],
             shield: Data.SHIELDS[g.shieldId],
             armor: Data.ARMORS[g.armorId],
-            helmet: Data.HELMETS[g.helmetId]
+            helmet: Data.HELMETS[g.helmetId],
+            consumable
         };
     }
 
@@ -578,64 +746,90 @@
             }
         }
 
-        if (opp.lethal) {
-            const names = myGlads.map(g => g.name).join(' ve ');
-            const ok = confirm(`⚠️ DİKKAT: Bu ÖLÜMÜNE bir maç!\n${names} yenilirse KALICI OLARAK ÖLECEK.\n\nYine de arenaya çıksın mı?`);
-            if (!ok) return;
+        const consIds = is2v2
+            ? [arenaConsumableSelect.value, arenaConsumableSelect2.value]
+            : [arenaConsumableSelect.value];
+        const consInv = ludus.state.inventory.consumables || {};
+        if (is2v2 && consIds[0] !== 'none' && consIds[0] === consIds[1] && (consInv[consIds[0]] || 0) < 2) {
+            showToast('Aynı tüketilebilir eşyadan 2 gladyatöre vermek için çantada en az 2 adet olmalı!', true);
+            return;
         }
 
-        matchInProgress = true;
-        ludusTree.paused = true;
-        arenaPrepView.classList.add('hidden');
-        arenaCombatView.classList.remove('hidden');
-        battleLogEl.innerHTML = '';
-        winnerBanner.classList.add('hidden');
+        const launchMatch = () => {
+            const usedConsumables = consIds.map(cid => ludus.consumeArenaItem(cid));
 
-        const leftConfigs = myGlads.map(g => toGladiatorConfig(g, false));
-        const rightConfigs = is2v2
-            ? [toGladiatorConfig(opp, false), toGladiatorConfig(opp.partner, false)]
-            : [toGladiatorConfig(opp, Boolean(opp.isBoss))];
+            matchInProgress = true;
+            ludusTree.paused = true;
+            arenaPrepView.classList.add('hidden');
+            arenaCombatView.classList.remove('hidden');
+            battleLogEl.innerHTML = '';
+            winnerBanner.classList.add('hidden');
 
-        currentArena = new Game.ArenaScene(leftConfigs, rightConfigs);
-        currentArena.onBattleLog.connect(addLog);
+            const leftConfigs = myGlads.map((g, idx) => toGladiatorConfig(g, false, usedConsumables[idx] || null));
+            const rightConfigs = is2v2
+                ? [toGladiatorConfig(opp, false), toGladiatorConfig(opp.partner, false)]
+                : [toGladiatorConfig(opp, Boolean(opp.isBoss))];
 
-        currentArena.onMatchFinished.connect((_, teamSide) => {
-            const didWin = teamSide === 'left';
-            const remHps = currentArena.leftTeam.map(f => f.hp);
-            const res = ludus.recordTeamMatchResult(selectedIds, opp.id, didWin, remHps);
-            renderTopStats();
+            currentArena = new Game.ArenaScene(leftConfigs, rightConfigs);
+            currentArena.onBattleLog.connect(addLog);
 
-            if (didWin) {
-                const lvlMsg = res.leveledNames.length > 0 ? ` 🌟 SEVİYE ATLADI: ${res.leveledNames.join(', ')}!` : '';
-                winnerText.textContent = `🏆 ZAFER! +${res.goldEarned} Altın, +${res.fameEarned} Şöhret (+${res.xpReward} XP)${lvlMsg}`;
-            } else if (res.deadNames.length > 0) {
-                const rookieMsg = res.rescuedByRookie ? ' (Sokaktan yeni bir çaylak katıldı!)' : '';
-                winnerText.textContent = `⚰️ ${res.deadNames.join(', ')} ARENADA CAN VERDİ!${rookieMsg}`;
-            } else {
-                const injTxt = res.injuries.length > 0 ? ` • 🩹 ${res.injuries[0]}` : '';
-                winnerText.textContent = `💀 YENİLGİ! (+${res.goldEarned} Altın, +${res.xpReward} XP${injTxt})`;
+            currentArena.onMatchFinished.connect((_, teamSide) => {
+                const didWin = teamSide === 'left';
+                const remHps = currentArena.leftTeam.map(f => f.hp);
+                const res = ludus.recordTeamMatchResult(selectedIds, opp.id, didWin, remHps);
+                renderTopStats();
+
+                if (didWin) {
+                    const lvlMsg = res.leveledNames.length > 0 ? ` 🌟 SEVİYE ATLADI: ${res.leveledNames.join(', ')}!` : '';
+                    winnerText.textContent = `🏆 ZAFER! +${res.goldEarned} Altın, +${res.fameEarned} Şöhret (+${res.xpReward} XP)${lvlMsg}`;
+                } else if (res.deadNames.length > 0) {
+                    const rookieMsg = res.rescuedByRookie ? ' (Sokaktan yeni bir çaylak katıldı!)' : '';
+                    winnerText.textContent = `⚰️ ${res.deadNames.join(', ')} ARENADA CAN VERDİ!${rookieMsg}`;
+                } else {
+                    const injTxt = res.injuries.length > 0 ? ` • 🩹 ${res.injuries[0]}` : '';
+                    winnerText.textContent = `💀 YENİLGİ! (+${res.goldEarned} Altın, +${res.xpReward} XP${injTxt})`;
+                }
+                winnerBanner.classList.remove('hidden');
+            });
+
+            tree.changeScene(currentArena);
+            tree.paused = false;
+
+            // HUD Hazırlığı (1v1 ve 2v2)
+            const L1 = currentArena.leftTeam[0];
+            const R1 = currentArena.rightTeam[0];
+            leftNameEl.textContent = L1.gladiatorName;
+            const c1Tag = L1.consumable ? ` • ${L1.consumable.name}` : '';
+            leftGearEl.textContent = `${L1.weapon.name}${L1.shield.hasShield ? ' + ' + L1.shield.name : ''} • ${L1.armor.name}${c1Tag}`;
+            rightNameEl.textContent = R1.gladiatorName;
+            rightGearEl.textContent = `${R1.weapon.name}${R1.shield.hasShield ? ' + ' + R1.shield.name : ''} • ${R1.armor.name}`;
+
+            const hasLeft2 = currentArena.leftTeam.length > 1;
+            const hasRight2 = currentArena.rightTeam.length > 1;
+            leftAllyHud.classList.toggle('hidden', !hasLeft2);
+            rightAllyHud.classList.toggle('hidden', !hasRight2);
+
+            if (hasLeft2) {
+                const L2 = currentArena.leftTeam[1];
+                leftAllyName.textContent = `${L2.gladiatorName}${L2.consumable ? ' • ' + L2.consumable.name : ''}`;
             }
-            winnerBanner.classList.remove('hidden');
-        });
+            if (hasRight2) rightAllyName.textContent = currentArena.rightTeam[1].gladiatorName;
+        };
 
-        tree.changeScene(currentArena);
-        tree.paused = false;
+        if (opp.lethal) {
+            const names = myGlads.map(g => g.name).join(' ve ');
+            openConfirmModal({
+                kicker: '💀 ÖLÜMÜNE ARENA MAÇI',
+                title: `${opp.name} ile Ölümüne Düello`,
+                desc: `⚠️ DİKKAT: ${names} bu maçta yenilirse KALICI OLARAK ÖLECEK. Yine de arenaya çıksın mı?`,
+                confirmLabel: '💀 Evet, Ölümüne Çık!',
+                cancelLabel: '🛡️ Vazgeç',
+                onConfirm: launchMatch
+            });
+            return;
+        }
 
-        // HUD Hazırlığı (1v1 ve 2v2)
-        const L1 = currentArena.leftTeam[0];
-        const R1 = currentArena.rightTeam[0];
-        leftNameEl.textContent = L1.gladiatorName;
-        leftGearEl.textContent = `${L1.weapon.name}${L1.shield.hasShield ? ' + ' + L1.shield.name : ''} • ${L1.armor.name}`;
-        rightNameEl.textContent = R1.gladiatorName;
-        rightGearEl.textContent = `${R1.weapon.name}${R1.shield.hasShield ? ' + ' + R1.shield.name : ''} • ${R1.armor.name}`;
-
-        const hasLeft2 = currentArena.leftTeam.length > 1;
-        const hasRight2 = currentArena.rightTeam.length > 1;
-        leftAllyHud.classList.toggle('hidden', !hasLeft2);
-        rightAllyHud.classList.toggle('hidden', !hasRight2);
-
-        if (hasLeft2) leftAllyName.textContent = currentArena.leftTeam[1].gladiatorName;
-        if (hasRight2) rightAllyName.textContent = currentArena.rightTeam[1].gladiatorName;
+        launchMatch();
     }
 
     returnLudusBtn.addEventListener('click', () => {
@@ -711,12 +905,49 @@
         });
     });
 
+    function renderEventModal() {
+        const ev = ludus.state.pendingEvent;
+        if (!ev || matchInProgress) {
+            romanEventModal.classList.add('hidden');
+            return;
+        }
+        romanEventModal.classList.remove('hidden');
+        eventModalTitle.textContent = ev.title;
+        eventModalDesc.textContent = ev.desc;
+        eventModalChoices.innerHTML = '';
+
+        (ev.choices || []).forEach(ch => {
+            const canAfford = ludus.state.gold >= (ch.minGold || 0);
+            const btn = document.createElement('button');
+            btn.className = 'event-choice-btn';
+            btn.disabled = !canAfford;
+            btn.innerHTML = `
+                <strong>${ch.label}</strong>
+                <span>${ch.hint}${canAfford ? '' : ' (Altın yetersiz!)'}</span>
+            `;
+            btn.addEventListener('click', () => {
+                const res = ludus.resolveRomanEvent(ch.id);
+                if (!res.ok) {
+                    showToast(res.msg || 'Karar uygulanamadı.', true);
+                } else {
+                    const lvlTxt = (res.leveledNames && res.leveledNames.length > 0)
+                        ? ` 🌟 Seviye Atladı: ${res.leveledNames.join(', ')}!`
+                        : '';
+                    showToast(res.summary + lvlTxt);
+                }
+                renderAll();
+            });
+            eventModalChoices.appendChild(btn);
+        });
+    }
+
     function renderAll() {
         renderTopStats();
         if (activeTab === 'ludus') renderLudusTab();
         else if (activeTab === 'shop') renderShopTab();
         else if (activeTab === 'market') renderMarketTab();
         else if (activeTab === 'arena') renderArenaTab();
+        renderEventModal();
     }
 
     document.getElementById('btn-toggle-dev').addEventListener('click', () => {
@@ -754,6 +985,18 @@
     document.getElementById('dev-heal-all').addEventListener('click', () => {
         ludus.devHealAll();
         showToast('💚 Test: Tüm kadro iyileştirildi!');
+        renderAll();
+    });
+    document.getElementById('dev-add-wins').addEventListener('click', () => {
+        const sel = ludus.getSelectedGladiator();
+        if (!sel) return;
+        ludus.devGrantWins(sel.id, 10);
+        showToast(`🏆 Test: ${sel.name} +10 Zafer kazandı (${sel.wins}G)!`);
+        renderAll();
+    });
+    document.getElementById('dev-trigger-event').addEventListener('click', () => {
+        if (matchInProgress) return;
+        ludus.devTriggerEvent();
         renderAll();
     });
 
@@ -821,11 +1064,18 @@
 
     document.getElementById('btn-reset-save').addEventListener('click', () => {
         if (matchInProgress) return;
-        if (confirm('Tüm ilerlemen silinip sıfırdan başlanacak, emin misin?')) {
-            ludus.newGame();
-            showToast('Yeni Ludus başlatıldı!');
-            renderAll();
-        }
+        openConfirmModal({
+            kicker: '🗑️ YENİ OYUN',
+            title: 'Kayıt Silinsin mi?',
+            desc: 'Tüm ilerlemen silinip sıfırdan yeni bir Ludus başlatılacak, emin misin?',
+            confirmLabel: '🗑️ Sıfırla ve Başlat',
+            cancelLabel: 'Vazgeç',
+            onConfirm: () => {
+                ludus.newGame();
+                showToast('Yeni Ludus başlatıldı!');
+                renderAll();
+            }
+        });
     });
 
     renderAll();

@@ -249,4 +249,37 @@
             desc: '+6 Zırh, %50 Kritik Direnci'
         }
     };
+
+    Data.CONSUMABLES = {
+        poison: {
+            id: 'poison',
+            name: '🐍 Silah Zehri',
+            price: 45,
+            tier: 1,
+            charges: 3,
+            bonusDmg: 4,
+            poisonDuration: 4.0,
+            poisonTickDmg: 4,
+            desc: 'İlk 3 vuruşta +4 zehir hasarı ve 4sn zehir (sn/4 pasif hasar)'
+        },
+        net: {
+            id: 'net',
+            name: '🕸️ Gladyatör Ağı',
+            price: 55,
+            tier: 1,
+            range: 240,
+            slowDuration: 4.5,
+            desc: 'Rakibe 240px menzilden ağ fırlatıp 4.5sn yavaşlatır'
+        },
+        potion: {
+            id: 'potion',
+            name: '🧪 Can Şurubu',
+            price: 50,
+            tier: 1,
+            hpThreshold: 0.45,
+            healAmount: 35,
+            staminaAmount: 25,
+            desc: 'Can %45 altına inince +35 Can ve +25 Stamina yeniler'
+        }
+    };
 })(window.LudusData = window.LudusData || {});

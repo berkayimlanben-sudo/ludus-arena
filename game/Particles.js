@@ -56,6 +56,22 @@
             }
         }
 
+        spawnPoison(x, y, count = 6) {
+            for (let i = 0; i < count; i++) {
+                this.particles.push({
+                    type: 'poison',
+                    x: x + (Math.random() - 0.5) * 26,
+                    y: y - 22 - Math.random() * 30,
+                    vx: (Math.random() - 0.5) * 32,
+                    vy: -32 - Math.random() * 42,
+                    size: 2.5 + Math.random() * 2.5,
+                    life: 0.45 + Math.random() * 0.3,
+                    maxLife: 0.75,
+                    color: Math.random() > 0.35 ? '#51cf66' : '#2b8a3e'
+                });
+            }
+        }
+
         spawnText(x, y, text, color = '#ffffff', size = 16) {
             this.texts.push({
                 x: x + (Math.random() - 0.5) * 18,

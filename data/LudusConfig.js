@@ -175,4 +175,120 @@
             baseStats: { strength: 14, agility: 9, vitality: 20 }
         }
     ];
+
+    Data.ROMAN_EVENTS = [
+        {
+            id: 'patrician_banquet',
+            title: '🍷 Asilzade Ziyafeti',
+            desc: 'Zengin bir Romalı patrici konağındaki ziyafet için gösteri dövüşçüsü istiyor.',
+            choices: [
+                {
+                    id: 'send_fighter',
+                    label: 'En iyi savaşçını gösteriye gönder',
+                    hint: '+75 Altın, +18 Şöhret • Seçili gladyatör -15 Can',
+                    minGold: 0
+                },
+                {
+                    id: 'bribe_wine',
+                    label: 'Şarap ikram et ve bağlantı kur',
+                    hint: '-50 Altın • +20 Şöhret',
+                    minGold: 50
+                },
+                {
+                    id: 'decline',
+                    label: 'Nazikçe reddet',
+                    hint: 'Etki yok',
+                    minGold: 0
+                }
+            ]
+        },
+        {
+            id: 'city_watch',
+            title: '⚖️ Şehir Muhafızlarının Baskını',
+            desc: 'Muhafız yüzbaşısı ruhsat ve vergi bahanesiyle avlu kapısına dayandı.',
+            choices: [
+                {
+                    id: 'pay_bribe',
+                    label: 'Keseyi aç ve rüşvet öde',
+                    hint: '-65 Altın • +6 Şöhret',
+                    minGold: 65
+                },
+                {
+                    id: 'stand_firm',
+                    label: 'Kapıyı kapat ve nöbet tut',
+                    hint: '-10 Şöhret • Tüm kadro +90 XP',
+                    minGold: 0
+                }
+            ]
+        },
+        {
+            id: 'merchant_wagon',
+            title: '🚚 Devrilmiş Tüccar Arabası',
+            desc: 'Ludus dışındaki yolda arena malzemeleri taşıyan bir arabanın tekeri kırılmış.',
+            choices: [
+                {
+                    id: 'help_merchant',
+                    label: 'Gladyatörlerle arabaya yardım et',
+                    hint: '+40 Altın • +14 Şöhret',
+                    minGold: 0
+                },
+                {
+                    id: 'buy_cheap',
+                    label: 'Ucuza ikmal sandığı satın al',
+                    hint: '-45 Altın • +1 Can Şurubu, +1 Gladyatör Ağı',
+                    minGold: 45
+                }
+            ]
+        },
+        {
+            id: 'greek_physician',
+            title: '🩺 Gezgin Yunan Hekim',
+            desc: 'Ünlü bir hekim Capua yolundan geçerken revirine uğradı.',
+            choices: [
+                {
+                    id: 'treat_all',
+                    label: 'Tüm kadroyu muayene ettir',
+                    hint: '-55 Altın • Tüm kadro tam iyileşir ve sakatlıklar silinir',
+                    minGold: 55
+                },
+                {
+                    id: 'buy_potion',
+                    label: 'Can Şurubu satın al',
+                    hint: '-35 Altın • +1 Can Şurubu',
+                    minGold: 35
+                },
+                {
+                    id: 'decline',
+                    label: 'Teşekkür edip gönder',
+                    hint: 'Etki yok',
+                    minGold: 0
+                }
+            ]
+        },
+        {
+            id: 'shadow_alchemist',
+            title: '🐍 Gizemli Simyacı',
+            desc: 'Karanlık cübbeli bir satıcı arena için özel zehir ve ağlar teklif ediyor.',
+            choices: [
+                {
+                    id: 'buy_kit',
+                    label: 'Gizli sandığı satın al',
+                    hint: '-55 Altın • +1 Silah Zehri, +1 Gladyatör Ağı',
+                    minGold: 55
+                },
+                {
+                    id: 'spar_test',
+                    label: 'Bileme taşını kullan',
+                    hint: '-35 Altın • Seçili gladyatöre +1 Güç',
+                    minGold: 35
+                },
+                {
+                    id: 'decline',
+                    label: 'Uzaklaşmasını söyle',
+                    hint: 'Etki yok',
+                    minGold: 0
+                }
+            ]
+        }
+    ];
 })(window.LudusData = window.LudusData || {});

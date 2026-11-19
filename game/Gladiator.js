@@ -34,6 +34,9 @@
             this.shield = config.shield || Data.SHIELDS.none;
             this.armor = config.armor || Data.ARMORS.tunic;
             this.helmet = config.helmet || Data.HELMETS.none;
+            this.consumable = config.consumable || null;
+            this.consumableUsed = false;
+            this.consumableCharges = (this.consumable && this.consumable.charges) ? this.consumable.charges : 0;
 
             const tId = this.trait ? this.trait.id : '';
             this.traitCritBonus = (tId === 'fierce' ? 0.10 : 0) + (this.hasPerk('swift_foot') ? 0.08 : 0);
@@ -70,7 +73,7 @@
             this.allFighters = [];
             this.opponent = null;
             this.particles = null;
-            this.arenaBounds = { left: 80, right: 880, groundY: 355 };
+            this.arenaBounds = { left: 80, right: 880, groundY: config.groundY || config.y || 355 };
 
             this.tacticOrder = null;
             this.tacticTimer = 0;
@@ -81,10 +84,14 @@
             this.activeEffects = {
                 bleed: 0,
                 bleedTick: 0,
+                poison: 0,
+                poisonTick: 0,
+                poisonDmg: 4,
                 stun: 0,
                 slow: 0,
                 armorBreak: 0
             };
+            this.lastPoisonAttacker = null;
 
             this.onDied = new Engine.Signal();
             this.onLog = new Engine.Signal();
@@ -113,6 +120,10 @@
 
         updateTarget() {
             if (this.enemies && this.enemies.length > 0) {
+                if (Game.CombatRules) {
+                    this.opponent = Game.CombatRules.selectBestTarget(this, this.enemies, this.allies);
+                    return;
+                }
                 const living = this.enemies.filter(e => e && e.hp > 0);
                 if (living.length === 0) {
                     this.opponent = null;
@@ -184,6 +195,7 @@
 
         getStateLabel() {
             let prefix = this.tacticOrder === 'AGGRESSIVE' ? '🔥 ' : (this.tacticOrder === 'DEFENSIVE' ? '🛡️ ' : '');
+            if (this.activeEffects.poison > 0) prefix += '🐍 ';
             if (this.activeEffects.bleed > 0) prefix += '🩸 ';
             if (this.activeEffects.slow > 0) prefix += '🕸️ ';
             if (this.activeEffects.armorBreak > 0) prefix += '💔 ';
@@ -496,6 +508,13 @@
                 if (weff.type === 'pierce') rawDamage += weff.bonusDmg;
             }
 
+            let poisonTriggered = false;
+            if (this.consumable && this.consumable.id === 'poison' && this.consumableCharges > 0) {
+                this.consumableCharges -= 1;
+                rawDamage += (this.consumable.bonusDmg || 4);
+                poisonTriggered = true;
+            }
+
             if (isCrit) rawDamage *= 1.55;
 
             const finalDmg = Math.max(3, Math.round(rawDamage));
@@ -549,6 +568,19 @@
                 }
             }
 
+            if (target.hp > 0 && poisonTriggered) {
+                const poisonDur = (this.consumable && (this.consumable.poisonDuration || this.consumable.bleedDuration)) || 4.0;
+                const poisonTickDmg = (this.consumable && this.consumable.poisonTickDmg) || 4;
+                target.activeEffects.poison = Math.max(target.activeEffects.poison, poisonDur);
+                target.activeEffects.poisonDmg = poisonTickDmg;
+                target.lastPoisonAttacker = this;
+                if (this.particles) {
+                    this.particles.spawnPoison(target.x, target.y, 6);
+                    this.particles.spawnText(target.x, target.y - 24, '🐍 ZEHİR!', '#51cf66', 14);
+                }
+                this.onLog.emit(`🐍 ${this.gladiatorName}'ın zehirli darbesi ${target.gladiatorName}'ı zehirledi!`);
+            }
+
             if (target.hp <= 0) {
                 target._die(this);
             } else if (!stunnedNow && (isCrit || Math.random() < 0.45)) {
@@ -559,7 +591,8 @@
         _die(killer) {
             this.hp = 0;
             this.tacticOrder = null;
-            this.activeEffects = { bleed: 0, bleedTick: 0, stun: 0, slow: 0, armorBreak: 0 };
+            this.activeEffects = { bleed: 0, bleedTick: 0, poison: 0, poisonTick: 0, poisonDmg: 4, stun: 0, slow: 0, armorBreak: 0 };
+            this.lastPoisonAttacker = null;
             this.fsm.transitionTo('DEAD');
             if (this.particles) this.particles.spawnDust(this.x, this.y, 10);
             this.onLog.emit(`⚔️ ${killer.gladiatorName}, ${this.gladiatorName}'ı yere serdi!`);
@@ -592,6 +625,36 @@
                     this.onLog.emit(`⚡ ${this.gladiatorName} İkinci Rüzgarını yakaladı (+15 Can, +40 Stamina)!`);
                 }
 
+                // Can Şurubu Tüketilebilir Eşyası
+                if (this.consumable && this.consumable.id === 'potion' && !this.consumableUsed && this.hp > 0 && this.hp <= this.maxHp * (this.consumable.hpThreshold || 0.45)) {
+                    this.consumableUsed = true;
+                    const heal = this.consumable.healAmount || 35;
+                    const stam = this.consumable.staminaAmount || 25;
+                    this.hp = Math.min(this.maxHp, this.hp + heal);
+                    this.stamina = Math.min(this.maxStamina, this.stamina + stam);
+                    if (this.particles) {
+                        this.particles.spawnSparks(this.x, this.y, 1, 14);
+                        this.particles.spawnText(this.x, this.y - 14, `🧪 +${heal} CAN!`, '#69db7c', 16);
+                    }
+                    this.onLog.emit(`🧪 ${this.gladiatorName} Can Şurubu içti (+${heal} Can, +${stam} Stamina)!`);
+                }
+
+                // Gladyatör Ağı Tüketilebilir Eşyası
+                if (this.consumable && this.consumable.id === 'net' && !this.consumableUsed && this.opponent && this.opponent.hp > 0) {
+                    const netRange = this.consumable.range || 240;
+                    if (Math.abs(this.opponent.x - this.x) <= netRange) {
+                        this.consumableUsed = true;
+                        const slowDur = this.consumable.slowDuration || 4.5;
+                        this.opponent.activeEffects.slow = Math.max(this.opponent.activeEffects.slow, slowDur);
+                        this.opponent.vx *= 0.2;
+                        if (this.particles) {
+                            this.particles.spawnSparks(this.opponent.x, this.opponent.y, -this.facing, 10);
+                            this.particles.spawnText(this.opponent.x, this.opponent.y - 16, '🕸️ AĞ ATILDI!', '#74c0fc', 15);
+                        }
+                        this.onLog.emit(`🕸️ ${this.gladiatorName}, ${this.opponent.gladiatorName}'a gladyatör ağı fırlattı!`);
+                    }
+                }
+
                 if (this.activeEffects.stun > 0) this.activeEffects.stun = Math.max(0, this.activeEffects.stun - delta);
                 if (this.activeEffects.slow > 0) this.activeEffects.slow = Math.max(0, this.activeEffects.slow - delta);
                 if (this.activeEffects.armorBreak > 0) this.activeEffects.armorBreak = Math.max(0, this.activeEffects.armorBreak - delta);
@@ -608,6 +671,24 @@
                         }
                         if (this.hp <= 0) {
                             this._die(this.opponent || this);
+                            return;
+                        }
+                    }
+                }
+
+                if (this.activeEffects.poison > 0) {
+                    this.activeEffects.poison = Math.max(0, this.activeEffects.poison - delta);
+                    this.activeEffects.poisonTick += delta;
+                    if (this.activeEffects.poisonTick >= 1.0) {
+                        this.activeEffects.poisonTick -= 1.0;
+                        const pDmg = this.activeEffects.poisonDmg || 4;
+                        this.hp = Math.max(0, this.hp - pDmg);
+                        if (this.particles) {
+                            this.particles.spawnPoison(this.x, this.y, 6);
+                            this.particles.spawnText(this.x, this.y - 8, `-${pDmg} ZEHİR`, '#51cf66', 15);
+                        }
+                        if (this.hp <= 0) {
+                            this._die(this.lastPoisonAttacker || this.opponent || this);
                             return;
                         }
                     }
@@ -633,13 +714,18 @@
             this.x = Math.max(this.arenaBounds.left, Math.min(this.arenaBounds.right, this.x));
 
             const others = this.allFighters.length > 0 ? this.allFighters : (this.opponent ? [this.opponent] : []);
-            for (const other of others) {
-                if (other !== this && other.hp > 0 && this.hp > 0) {
-                    const dx = this.x - other.x;
-                    const minGap = 40;
-                    if (Math.abs(dx) < minGap) {
-                        const pushDir = dx >= 0 ? 1 : -1;
-                        this.x += pushDir * (minGap - Math.abs(dx)) * 0.5;
+            if (Game.CombatRules) {
+                this.x += Game.CombatRules.computeOverlapPushX(this, others);
+                this.x = Math.max(this.arenaBounds.left, Math.min(this.arenaBounds.right, this.x));
+            } else {
+                for (const other of others) {
+                    if (other !== this && other.hp > 0 && this.hp > 0) {
+                        const dx = this.x - other.x;
+                        const minGap = 40;
+                        if (Math.abs(dx) < minGap) {
+                            const pushDir = dx >= 0 ? 1 : -1;
+                            this.x += pushDir * (minGap - Math.abs(dx)) * 0.5;
+                        }
                     }
                 }
             }

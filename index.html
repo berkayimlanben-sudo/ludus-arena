@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ludus Arena — Gladyatör Yönetimi (v0.7)</title>
+    <title>Ludus Arena — Gladyatör Yönetimi (v0.8)</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="game-wrapper">
         <header class="top-bar">
-            <div class="brand">⚔️ LUDUS ARENA <span class="badge">v0.7 2v2 & Perkler</span></div>
+            <div class="brand">⚔️ LUDUS ARENA <span class="badge">v0.8 Eşyalar, Doctore & Olaylar</span></div>
 
             <div class="resource-bar">
                 <span id="ui-day" class="res-pill">Gün 1</span>
@@ -36,6 +36,8 @@
             <button id="dev-spawn-2v2">⚔️ 2v2 Kontrat Aç</button>
             <button id="dev-boss-day">👑 Boss Günü</button>
             <button id="dev-heal-all">💚 İyileştir</button>
+            <button id="dev-add-wins">🏆 +10 Zafer</button>
+            <button id="dev-trigger-event">📜 Olay Kartı</button>
         </div>
 
         <nav class="tab-nav">
@@ -56,6 +58,7 @@
             <div class="ludus-layout">
                 <div class="panel-box">
                     <h3 class="panel-title">Gladyatör Kadron</h3>
+                    <div id="doctore-banner" class="doctore-banner hidden"></div>
                     <div id="roster-list" class="roster-list"></div>
                 </div>
                 <div id="selected-gladiator-panel" class="panel-box"></div>
@@ -87,8 +90,17 @@
                     <label>1. Gladyatör (Ön Saf):
                         <select id="arena-fighter-select"></select>
                     </label>
+                    <div id="arena-consumable-wrap" class="consumable-pick-wrap" style="margin-top:8px;">
+                        <label>🧪 Maç Eşyası (1. Gladyatör):
+                            <select id="arena-consumable-select"></select>
+                        </label>
+                        <div id="arena-consumable-chips" class="consumable-chips"></div>
+                    </div>
                     <label id="arena-fighter-2-wrap" class="hidden" style="margin-top:8px;">2. Gladyatör (2v2 Arka Saf):
                         <select id="arena-fighter-select-2"></select>
+                    </label>
+                    <label id="arena-consumable-2-wrap" class="hidden" style="margin-top:8px;">🧪 Maç Eşyası (2. Gladyatör):
+                        <select id="arena-consumable-select-2"></select>
                     </label>
                 </div>
                 <div id="arena-opponents-list" class="opponents-grid"></div>
@@ -179,6 +191,27 @@
         </section>
     </div>
 
+    <div id="roman-event-modal" class="event-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="event-modal-title">
+        <div class="event-modal-card">
+            <div class="event-modal-kicker">🏛️ ROMA OLAY KARTI</div>
+            <h3 id="event-modal-title"></h3>
+            <p id="event-modal-desc"></p>
+            <div id="event-modal-choices" class="event-choices"></div>
+        </div>
+    </div>
+
+    <div id="confirm-modal" class="event-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+        <div class="event-modal-card confirm-modal-card">
+            <div id="confirm-modal-kicker" class="event-modal-kicker confirm-kicker">⚠️ ONAY GEREKİYOR</div>
+            <h3 id="confirm-modal-title"></h3>
+            <p id="confirm-modal-desc"></p>
+            <div class="confirm-actions">
+                <button id="confirm-modal-cancel" type="button" class="cancel-confirm-btn">Vazgeç</button>
+                <button id="confirm-modal-ok" type="button" class="danger-confirm-btn">Onayla</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Çekirdek Motor -->
     <script src="engine/Signal.js"></script>
     <script src="engine/Node.js"></script>
@@ -201,9 +234,11 @@
     <script src="game/renderers/LudusRenderer.js"></script>
 
     <!-- Oyun & Yönetim -->
+    <script src="game/CombatRules.js"></script>
     <script src="game/Gladiator.js"></script>
     <script src="game/ArenaScene.js"></script>
     <script src="game/LudusScene.js"></script>
+    <script src="game/Phase7Rules.js"></script>
     <script src="game/LudusManager.js"></script>
     <script src="game/main.js"></script>
 </body>
