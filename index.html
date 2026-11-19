@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ludus Arena — Gladyatör Simülasyonu (v0.1)</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-wrapper">
+        <header class="top-bar">
+            <div class="brand">⚔️ LUDUS ARENA <span class="badge">v0.1 Simülasyon Prototipi</span></div>
+            <div class="controls">
+                <select id="matchup-select">
+                    <option value="sword_vs_spear">Kılıç & Kalkan vs Uzun Mızrak</option>
+                    <option value="axe_vs_sword">Hızlı Kılıç vs Ağır Balta</option>
+                </select>
+                <div class="speed-group">
+                    <button class="speed-btn" data-speed="0">⏸</button>
+                    <button class="speed-btn active" data-speed="1">1x</button>
+                    <button class="speed-btn" data-speed="2">2x</button>
+                    <button class="speed-btn" data-speed="3">3x</button>
+                </div>
+                <button id="restart-btn" class="primary-btn">🔄 Yeni Düello</button>
+            </div>
+        </header>
+
+        <section class="hud">
+            <div class="fighter-card left">
+                <div class="fighter-header">
+                    <span id="left-name" class="fighter-name">Maximus</span>
+                    <span id="left-state" class="state-pill">HAZIR</span>
+                </div>
+                <div id="left-gear" class="fighter-gear">Gladius + Scutum</div>
+                <div class="bar-wrap hp">
+                    <div id="left-hp-bar" class="bar-fill"></div>
+                    <span id="left-hp-text" class="bar-label">120 / 120</span>
+                </div>
+                <div class="bar-wrap stam">
+                    <div id="left-stam-bar" class="bar-fill"></div>
+                </div>
+            </div>
+
+            <div class="vs-badge">VS</div>
+
+            <div class="fighter-card right">
+                <div class="fighter-header">
+                    <span id="right-state" class="state-pill">HAZIR</span>
+                    <span id="right-name" class="fighter-name">Crixus</span>
+                </div>
+                <div id="right-gear" class="fighter-gear">Uzun Mızrak</div>
+                <div class="bar-wrap hp">
+                    <div id="right-hp-bar" class="bar-fill"></div>
+                    <span id="right-hp-text" class="bar-label">110 / 110</span>
+                </div>
+                <div class="bar-wrap stam">
+                    <div id="right-stam-bar" class="bar-fill"></div>
+                </div>
+            </div>
+        </section>
+
+        <main class="arena-container">
+            <canvas id="arena-canvas" width="960" height="460"></canvas>
+            <div id="winner-banner" class="winner-banner hidden">
+                <span id="winner-text">ZAFER!</span>
+            </div>
+        </main>
+
+        <section class="log-panel">
+            <div class="log-title">📜 Arena Savaş Kaydı</div>
+            <div id="battle-log" class="battle-log"></div>
+        </section>
+    </div>
+
+    <!-- Godot-Esintili Çekirdek Motor -->
+    <script src="engine/Signal.js"></script>
+    <script src="engine/Node.js"></script>
+    <script src="engine/Node2D.js"></script>
+    <script src="engine/StateMachine.js"></script>
+    <script src="engine/Camera2D.js"></script>
+    <script src="engine/SceneTree.js"></script>
+
+    <!-- Oyun Dosyaları -->
+    <script src="game/Particles.js"></script>
+    <script src="game/Gladiator.js"></script>
+    <script src="game/ArenaScene.js"></script>
+    <script src="game/main.js"></script>
+</body>
+</html>

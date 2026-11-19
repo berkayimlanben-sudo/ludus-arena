@@ -1,0 +1,236 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: #12100e;
+    color: #f3ead8;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 16px;
+}
+
+.game-wrapper {
+    width: 100%;
+    max-width: 980px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.top-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    background: #1e1915;
+    border: 1px solid #4a3a28;
+    padding: 10px 14px;
+    border-radius: 8px;
+}
+
+.brand {
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: #e6b85c;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.badge {
+    font-size: 11px;
+    background: #33281d;
+    color: #cbb89d;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+select, button {
+    background: #2b231b;
+    color: #f3ead8;
+    border: 1px solid #594632;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.speed-group {
+    display: flex;
+    gap: 4px;
+}
+
+.speed-btn.active {
+    background: #c88a2e;
+    color: #12100e;
+    font-weight: 700;
+    border-color: #e6b85c;
+}
+
+.primary-btn {
+    background: #9e2a2b;
+    border-color: #c83e37;
+    font-weight: 600;
+}
+
+.primary-btn:hover {
+    background: #b53233;
+}
+
+.hud {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 12px;
+    align-items: center;
+}
+
+.fighter-card {
+    background: #1e1915;
+    border: 1px solid #4a3a28;
+    padding: 10px 12px;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.fighter-card.left { border-left: 4px solid #c83e37; }
+.fighter-card.right { border-right: 4px solid #2c6eb5; text-align: right; }
+
+.fighter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.fighter-name {
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.fighter-gear {
+    font-size: 12px;
+    color: #b8a58d;
+}
+
+.state-pill {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 99px;
+    background: #33281d;
+    color: #e6b85c;
+}
+
+.bar-wrap {
+    position: relative;
+    background: #0f0c0a;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid #382c20;
+}
+
+.bar-wrap.hp { height: 20px; }
+.bar-wrap.stam { height: 7px; }
+
+.bar-fill {
+    height: 100%;
+    width: 100%;
+    transition: width 0.08s linear;
+}
+
+.hp .bar-fill { background: linear-gradient(90deg, #a8201a, #e03c31); }
+.right .hp .bar-fill { background: linear-gradient(90deg, #245b96, #3b82d9); }
+.stam .bar-fill { background: #e6b85c; }
+
+.bar-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    text-shadow: 0 1px 2px #000;
+}
+
+.vs-badge {
+    font-weight: 900;
+    font-size: 18px;
+    color: #e6b85c;
+}
+
+.arena-container {
+    position: relative;
+    border: 2px solid #594632;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #000;
+}
+
+#arena-canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 960 / 460;
+}
+
+.winner-banner {
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(18, 16, 14, 0.92);
+    border: 2px solid #e6b85c;
+    color: #e6b85c;
+    padding: 10px 26px;
+    border-radius: 8px;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+}
+
+.hidden { display: none; }
+
+.log-panel {
+    background: #1e1915;
+    border: 1px solid #4a3a28;
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+
+.log-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #e6b85c;
+    margin-bottom: 6px;
+}
+
+.battle-log {
+    height: 92px;
+    overflow-y: auto;
+    font-size: 13px;
+    color: #d6c8b4;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.log-line {
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    padding-bottom: 2px;
+}
