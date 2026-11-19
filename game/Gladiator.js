@@ -335,7 +335,7 @@
                 },
                 update(dt) {
                     g.stateTimer += dt;
-                    g.vx *= 0.88;
+                    g.vx *= Math.pow(0.88, dt * 60);
 
                     if (!g.hasHitThisSwing && g.stateTimer >= g.stateDuration * 0.45) {
                         g.hasHitThisSwing = true;
@@ -374,7 +374,7 @@
                     g._faceOpponent();
                 },
                 update(dt) {
-                    g.vx *= 0.9;
+                    g.vx *= Math.pow(0.90, dt * 60);
                     g.stateTimer -= dt;
                     if (g.stateTimer <= 0) g.fsm.transitionTo('IDLE');
                 }
@@ -397,7 +397,7 @@
             this.fsm.addState('HURT', {
                 enter() { g.stateTimer = 0.19; },
                 update(dt) {
-                    g.vx *= 0.85;
+                    g.vx *= Math.pow(0.85, dt * 60);
                     g.stateTimer -= dt;
                     if (g.stateTimer <= 0) g.fsm.transitionTo('IDLE');
                 }
@@ -405,8 +405,8 @@
 
             this.fsm.addState('STUNNED', {
                 enter() { g.vx = 0; },
-                update() {
-                    g.vx *= 0.85;
+                update(dt) {
+                    g.vx *= Math.pow(0.85, dt * 60);
                     if (g.activeEffects.stun <= 0) g.fsm.transitionTo('IDLE');
                 }
             });
@@ -417,7 +417,7 @@
                     g.vy = -80;
                 },
                 update(dt) {
-                    g.vx *= 0.92;
+                    g.vx *= Math.pow(0.92, dt * 60);
                     g.deathAngle = Math.min(Math.PI / 2, g.deathAngle + dt * 4.5);
                 }
             });
@@ -581,9 +581,13 @@
                 this.onLog.emit(`🐍 ${this.gladiatorName}'ın zehirli darbesi ${target.gladiatorName}'ı zehirledi!`);
             }
 
+            const targetState = target.fsm.currentStateName;
+            const hasHyperArmor = (target.weapon && target.weapon.weight >= 6) &&
+                ((targetState === 'WINDUP' && target.stateTimer >= target.stateDuration * 0.45) || targetState === 'ATTACK');
+
             if (target.hp <= 0) {
                 target._die(this);
-            } else if (!stunnedNow && (isCrit || Math.random() < 0.45)) {
+            } else if (!stunnedNow && !hasHyperArmor && (isCrit || Math.random() < 0.45)) {
                 target.fsm.transitionTo('HURT');
             }
         }
@@ -600,7 +604,11 @@
         }
 
         _process(delta) {
-            this.updateTarget();
+            const curState = this.fsm.currentStateName;
+            if (!this.opponent || this.opponent.hp <= 0 ||
+                curState === 'IDLE' || curState === 'APPROACH' || curState === 'RETREAT') {
+                this.updateTarget();
+            }
 
             if (this.attackCooldown > 0) this.attackCooldown -= delta;
             if (this.hitFlash > 0) this.hitFlash -= delta;

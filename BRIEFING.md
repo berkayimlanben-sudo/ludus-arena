@@ -40,7 +40,7 @@
   * `LudusManager.js`: Ekonomi, kadro, binalar, günlük kontratlar, `consumeArenaItem()`, `retireAsDoctore()`, `resolveRomanEvent()`, `localStorage` (`ludus_arena_save_v1`) + JSON Import/Export + `_migrateState()` (`v0.7 → v0.8` geriye dönük uyumlu) + `🛠️ Test` hile metodları (`+10 Zafer` ve `Olay Kartı` dahil).
   * `main.js`: Tüm UI render ve olay bağlantıları (Arena tüketilebilir hızlı seçim çipleri, Ludus çanta eşyası çubuğu, Doctore kartı, Roma olay modalı, `#confirm-modal`).
 * `tests/` & Sunucu:
-  * `tests/combat_rules.test.js` (5 test) ve `tests/phase7_rules.test.js` (4 test) — toplam 9 adet `node:test` birim ve simülasyon testi.
+  * `tests/combat_rules.test.js` (5 test), `tests/phase7_rules.test.js` (4 test) ve `tests/bugs_balance.test.js` (7 test) — toplam 16 adet `node:test` birim ve simülasyon testi (`npm test`).
   * `server.js` (Express v5 statik sunucu, `0.0.0.0:3000`).
 
 ---
@@ -63,6 +63,11 @@
 * **Ölümüne Maçların Iframe İçinde Açılmaması (`v0.8`):** `main.js` içindeki yerleşik `window.confirm()` çağrıları (ölümüne maç ve yeni oyun sıfırlaması) AI Studio iframe sandbox'ında sessizce `false` döndüğü için uygulama içi **`#confirm-modal`** penceresiyle değiştirildi.
 * **Zehir Pasif Hasar Görünürlüğü & Eşya Kullanım Akışı (`v0.8`):** Zehir hasarı kanamadan ayrılıp yeşil `-4 ZEHİR` sayacına bağlandı; Arena hazırlığına tek tık seçim çipleri ve Ludus/Demirci yönlendirmeleri eklendi.
 * **Gizli Sekme Canvas Yükü (`v0.8`):** `SceneTree._loop` görünmeyen canvaslarda yeniden çizimi atlar.
+* **Savaş Fiziği, Denge & Ekonomi Düzeltmeleri (`v0.8`):**
+  * Ağır silahlara (`weight >= 6`) geç `WINDUP`/`ATTACK` sırasında Hyper-Armor (kesintiye direnç) eklendi; hız sönümlemesi Hz bağımsız (`Math.pow(factor, dt * 60)`) hale getirildi.
+  * Saldırı (`WINDUP`/`ATTACK`) sırasında hedef kilitleme ve 2v2 şerit kan zemini (`groundY`) düzeltildi.
+  * Sakatlıkların gecede bedava silinmesi kaldırıldı (yalnızca Revir tedavisi veya aç olmayan kadroda Revir Sv.2+ ile şansla iyileşme) ve açlık + tek gladyatör `<%25` HP softlock engeli eklendi.
+  * Çoklu seviye atlamada perk kuyruğu (`pendingPerkCount`), Mevcut Doctore üzerine yazma onayı (`#confirm-modal`), `getGladiatorSummary` stil hız bonusu ve düşman/Boss stil + perk üretimi/keşif etiketleri eklendi.
 
 ---
 

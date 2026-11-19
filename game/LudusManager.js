@@ -90,6 +90,7 @@
                 if (obj.xpToNext === undefined) obj.xpToNext = 100 + (obj.level - 1) * 60;
                 if (!Array.isArray(obj.perks)) obj.perks = [];
                 if (obj.pendingPerkChoices === undefined) obj.pendingPerkChoices = null;
+                if (obj.pendingPerkCount === undefined) obj.pendingPerkCount = obj.pendingPerkChoices ? 1 : 0;
                 if (obj.wins === undefined) obj.wins = 0;
                 if (obj.losses === undefined) obj.losses = 0;
             };
@@ -100,6 +101,7 @@
                 if (opp.lethal === undefined) opp.lethal = false;
                 if (!opp.ruleId) opp.ruleId = 'standard';
                 if (opp.partner === undefined) opp.partner = null;
+                if (opp.partner) ensureGlad(opp.partner);
             });
         }
 
@@ -119,6 +121,7 @@
                 xpToNext: 100,
                 perks: opts.perks || [],
                 pendingPerkChoices: null,
+                pendingPerkCount: 0,
                 fatigue: 0,
                 injuryId: null,
                 stats,
@@ -168,9 +171,10 @@
             const maxHp = this.getGladiatorMaxHp(g);
             const traitDef = g.traitId === 'iron_skin' ? 3 : (g.traitId === 'fierce' ? -2 : 0);
             const traitSpd = (g.traitId === 'nimble' ? 18 : 0) + ((g.perks && g.perks.includes('swift_foot')) ? 16 : 0);
+            const styleSpd = g.styleId === 'skirmisher' ? 14 : (g.styleId === 'aggressive' ? 8 : 0);
 
             const def = Math.max(0, Math.round(eff.vitality * 0.35) + a.defense + h.defense + traitDef);
-            const spd = Math.max(60, Math.round(128 + eff.agility * 4 - weight * 2.4 + traitSpd));
+            const spd = Math.max(60, Math.round(128 + eff.agility * 4 - weight * 2.4 + traitSpd + styleSpd));
             return { maxHp, def, spd, weight, eff };
         }
 
@@ -217,12 +221,42 @@
 
             const helmetId = pickItemByTier(Data.HELMETS, true);
             const armorObj = Data.ARMORS[armorId];
-            const maxHp = 80 + stats.vitality * 6 + armorObj.hpBonus;
+
+            let stylePool = ['balanced', 'aggressive', 'counter', 'skirmisher'];
+            if (weaponId === 'spear' || weaponId === 'trident' || weaponId === 'dagger') {
+                stylePool = ['skirmisher', 'aggressive', 'balanced'];
+            } else if (shieldId !== 'none') {
+                stylePool = ['counter', 'balanced', 'aggressive'];
+            } else if (weaponId === 'axe' || weaponId === 'mace') {
+                stylePool = ['aggressive', 'balanced', 'counter'];
+            }
+            const styleId = pickRandom(stylePool);
+
+            const perks = [];
+            let perkCount = 0;
+            if (tier.maxTier === 2) {
+                perkCount = Math.random() < 0.70 ? 1 : 0;
+            } else if (tier.maxTier >= 3) {
+                perkCount = Math.random() < 0.50 ? 2 : 1;
+            }
+            if (perkCount > 0 && Data.PERKS) {
+                const eligible = Object.keys(Data.PERKS).filter(pid => {
+                    if (pid === 'shield_master' && shieldId === 'none') return false;
+                    if (pid === 'back_to_back' && ruleId !== 'team_2v2') return false;
+                    return true;
+                }).sort(() => Math.random() - 0.5);
+                perks.push(...eligible.slice(0, perkCount));
+            }
+
+            const perkHp = perks.includes('iron_will') ? 20 : 0;
+            const maxHp = 80 + stats.vitality * 6 + armorObj.hpBonus + perkHp;
 
             return {
                 name: pickRandom(Data.GLADIATOR_NAMES),
                 skinColor: pickRandom(Data.SKIN_TONES),
                 traitId: pickRandomKey(Data.TRAITS),
+                styleId,
+                perks,
                 stats,
                 weaponId,
                 shieldId,
@@ -248,6 +282,8 @@
                 name: f1.name,
                 skinColor: f1.skinColor,
                 traitId: f1.traitId,
+                styleId: f1.styleId,
+                perks: f1.perks,
                 stats: f1.stats,
                 weaponId: f1.weaponId,
                 shieldId: f1.shieldId,
@@ -307,7 +343,8 @@
                         vitality: tpl.baseStats.vitality + bossTier * 2
                     };
                     const armorObj = Data.ARMORS[tpl.armorId];
-                    const maxHp = 80 + stats.vitality * 6 + armorObj.hpBonus;
+                    const bossPerks = Array.isArray(tpl.perks) ? tpl.perks.slice() : [];
+                    const maxHp = 80 + stats.vitality * 6 + armorObj.hpBonus + (bossPerks.includes('iron_will') ? 20 : 0);
 
                     this.state.dailyOpponents.push({
                         id: 'boss_' + Date.now(),
@@ -319,6 +356,8 @@
                         name: tpl.name,
                         skinColor: tpl.skinColor,
                         traitId: tpl.traitId,
+                        styleId: tpl.styleId || 'balanced',
+                        perks: bossPerks,
                         stats,
                         weaponId: tpl.weaponId,
                         shieldId: tpl.shieldId,
@@ -370,6 +409,8 @@
                     name: f.name,
                     skinColor: f.skinColor,
                     traitId: f.traitId,
+                    styleId: f.styleId,
+                    perks: f.perks,
                     stats: f.stats,
                     weaponId: f.weaponId,
                     shieldId: f.shieldId,
@@ -395,6 +436,13 @@
         }
 
         // --- XP, SEVİYE VE PERK SİSTEMİ ---
+        _rollPerkChoices(g) {
+            const available = Object.keys(Data.PERKS).filter(id => !(g.perks || []).includes(id));
+            if (available.length === 0) return null;
+            const shuffled = available.slice().sort(() => Math.random() - 0.5);
+            return shuffled.slice(0, 3);
+        }
+
         grantXp(g, amount) {
             if (!g) return false;
             const effectiveXp = Game.Phase7Rules
@@ -413,11 +461,11 @@
                 g.currentHp = Math.min(this.getGladiatorMaxHp(g), g.currentHp + 6);
                 leveledUp = true;
 
-                if (!g.pendingPerkChoices) {
-                    const available = Object.keys(Data.PERKS).filter(id => !g.perks.includes(id));
-                    if (available.length > 0) {
-                        const shuffled = available.sort(() => Math.random() - 0.5);
-                        g.pendingPerkChoices = shuffled.slice(0, 3);
+                const choices = g.pendingPerkChoices || this._rollPerkChoices(g);
+                if (choices && choices.length > 0) {
+                    g.pendingPerkCount = (g.pendingPerkCount || 0) + 1;
+                    if (!g.pendingPerkChoices) {
+                        g.pendingPerkChoices = choices;
                     }
                 }
             }
@@ -429,7 +477,18 @@
             if (!g || !g.pendingPerkChoices || !g.pendingPerkChoices.includes(perkId)) return { ok: false };
 
             g.perks.push(perkId);
-            g.pendingPerkChoices = null;
+            g.pendingPerkCount = Math.max(0, (g.pendingPerkCount || 1) - 1);
+            if (g.pendingPerkCount > 0) {
+                const nextChoices = this._rollPerkChoices(g);
+                if (nextChoices && nextChoices.length > 0) {
+                    g.pendingPerkChoices = nextChoices;
+                } else {
+                    g.pendingPerkChoices = null;
+                    g.pendingPerkCount = 0;
+                }
+            } else {
+                g.pendingPerkChoices = null;
+            }
             if (perkId === 'iron_will') {
                 g.currentHp = Math.min(this.getGladiatorMaxHp(g), g.currentHp + 20);
             }
@@ -728,11 +787,33 @@
             let healPct = 0.25 + (this.state.buildings.infirmary - 1) * 0.15;
             if (starved) healPct *= 0.4;
 
+            const infLvl = this.state.buildings.infirmary || 1;
+            const overnightCureChance = (!starved && infLvl >= 2) ? Math.min(0.85, (infLvl - 1) * 0.25) : 0;
+            const healedInjuries = [];
+
             for (const g of this.state.roster) {
                 g.fatigue = 0;
-                g.injuryId = null;
+                if (g.injuryId && overnightCureChance > 0 && Math.random() < overnightCureChance) {
+                    g.injuryId = null;
+                    healedInjuries.push(g.name);
+                }
                 const maxHp = this.getGladiatorMaxHp(g);
                 g.currentHp = Math.min(maxHp, g.currentHp + Math.ceil(maxHp * healPct));
+            }
+
+            // Açlık + yetersiz altın + tüm kadro <%25 can ölüm spiralini (softlock) önle
+            let starvationFloorApplied = false;
+            if (this.state.roster.length > 0) {
+                const anyArenaReady = this.state.roster.some(r => r.currentHp >= Math.ceil(this.getGladiatorMaxHp(r) * 0.25));
+                const minHealCost = Math.min(...this.state.roster.map(r => this.getHealCost(r)));
+                if (!anyArenaReady && this.state.gold < minHealCost) {
+                    const fallback = this.getSelectedGladiator() || this.state.roster[0];
+                    const readyFloor = Math.ceil(this.getGladiatorMaxHp(fallback) * 0.25);
+                    if (fallback.currentHp < readyFloor) {
+                        fallback.currentHp = readyFloor;
+                        starvationFloorApplied = true;
+                    }
+                }
             }
 
             this.refreshDailyEvents();
@@ -751,7 +832,7 @@
             }
 
             this.saveToLocalStorage();
-            return { upkeep, starved, eventTriggered };
+            return { upkeep, starved, eventTriggered, healedInjuries, starvationFloorApplied };
         }
 
         resolveRomanEvent(choiceId) {

@@ -192,6 +192,7 @@
             const trait = Data.TRAITS[g.traitId];
             const injury = g.injuryId ? Data.INJURIES[g.injuryId] : null;
             const hasPending = Boolean(g.pendingPerkChoices);
+            const pendingCount = g.pendingPerkCount || (hasPending ? 1 : 0);
 
             const card = document.createElement('div');
             card.className = `roster-card ${isSel ? 'selected' : ''} ${hasPending ? 'level-ready' : ''}`;
@@ -201,7 +202,7 @@
                     <span class="rc-origin">${g.origin}</span>
                 </div>
                 <div class="rc-tags">
-                    ${hasPending ? '<span class="perk-alert-badge">🌟 PERK SEÇ!</span>' : ''}
+                    ${hasPending ? `<span class="perk-alert-badge">🌟 PERK SEÇ!${pendingCount > 1 ? ` (×${pendingCount})` : ''}</span>` : ''}
                     ${trait ? `<span class="trait-badge">${trait.name}</span>` : ''}
                     ${getFatigueBadge(g.fatigue)}
                     ${injury ? `<span class="injury-badge">🩹 ${injury.name}</span>` : ''}
@@ -238,6 +239,7 @@
 
             let perkChoiceHTML = '';
             if (sel.pendingPerkChoices && sel.pendingPerkChoices.length > 0) {
+                const pendingCount = sel.pendingPerkCount || 1;
                 const cards = sel.pendingPerkChoices.map(pid => {
                     const p = Data.PERKS[pid];
                     return `
@@ -249,7 +251,7 @@
                 }).join('');
                 perkChoiceHTML = `
                     <div class="perk-picker-box">
-                        <div class="perk-picker-title">🌟 SEVİYE ATLADI! (Sv. ${sel.level}) — Bir Perk Seç:</div>
+                        <div class="perk-picker-title">🌟 SEVİYE ATLADI! (Sv. ${sel.level}) — Bir Perk Seç:${pendingCount > 1 ? ` <span class="badge">${pendingCount} hak bekliyor</span>` : ''}</div>
                         <div class="perk-choices-grid">${cards}</div>
                     </div>
                 `;
@@ -403,13 +405,29 @@
             const doctoreBtn = document.getElementById('btn-retire-doctore');
             if (doctoreBtn) {
                 doctoreBtn.addEventListener('click', () => {
-                    const res = ludus.retireAsDoctore(sel.id);
-                    if (!res.ok) {
-                        showToast(res.msg || 'Emekli edilemedi.', true);
-                    } else {
-                        showToast(`🏛️ ${res.doctore.name} artık Ludus Baş Eğitmeni (Doctore)!`);
+                    const performRetire = () => {
+                        const res = ludus.retireAsDoctore(sel.id);
+                        if (!res.ok) {
+                            showToast(res.msg || 'Emekli edilemedi.', true);
+                        } else {
+                            showToast(`🏛️ ${res.doctore.name} artık Ludus Baş Eğitmeni (Doctore)!`);
+                        }
+                        renderAll();
+                    };
+
+                    if (ludus.state.doctore) {
+                        openConfirmModal({
+                            kicker: '🏛️ BAŞ EĞİTMEN DEĞİŞİMİ',
+                            title: 'Mevcut Doctore Değiştirilsin mi?',
+                            desc: `Mevcut Baş Eğitmen ${ludus.state.doctore.name} görevden ayrılacak ve yerine ${sel.name} geçecek. Onaylıyor musun?`,
+                            confirmLabel: '🏛️ Evet, Değiştir',
+                            cancelLabel: 'Vazgeç',
+                            onConfirm: performRetire
+                        });
+                        return;
                     }
-                    renderAll();
+
+                    performRetire();
                 });
             }
 
@@ -634,6 +652,11 @@
             const a = Data.ARMORS[opp.armorId];
             const h = Data.HELMETS[opp.helmetId];
             const trait = Data.TRAITS[opp.traitId];
+            const oppStyle = Data.FIGHT_STYLES[opp.styleId || 'balanced'];
+            const oppPerkTags = (opp.perks || []).map(pid => {
+                const p = Data.PERKS[pid];
+                return p ? `<span class="perk-badge" title="${p.desc}">${p.name}</span>` : '';
+            }).join('');
             const rule = Data.ARENA_RULES[opp.ruleId || 'standard'];
 
             const cardClass = [
@@ -656,7 +679,10 @@
             if (opp.ruleId === 'team_2v2' && opp.partner) {
                 const pw = Data.WEAPONS[opp.partner.weaponId];
                 const ps = Data.SHIELDS[opp.partner.shieldId];
-                partnerHTML = `<div class="partner-line">➕ Ortak: <b>${opp.partner.name}</b> (~${opp.partner.maxHp} Can, ${pw.name}${ps.hasShield ? '+' + ps.name : ''})</div>`;
+                const pStyle = Data.FIGHT_STYLES[opp.partner.styleId || 'balanced'];
+                const pPerks = (opp.partner.perks || []).map(pid => Data.PERKS[pid] ? Data.PERKS[pid].name : '').filter(Boolean);
+                const pExtra = [pStyle ? pStyle.name : '', ...pPerks].filter(Boolean).join(' • ');
+                partnerHTML = `<div class="partner-line">➕ Ortak: <b>${opp.partner.name}</b> (~${opp.partner.maxHp} Can, ${pw.name}${ps.hasShield ? '+' + ps.name : ''}${pExtra ? ` • ${pExtra}` : ''})</div>`;
             }
 
             const card = document.createElement('div');
@@ -670,6 +696,8 @@
                     ${matchTypeTag}
                     ${ruleTag}
                     ${trait ? `<span class="trait-badge">${trait.name}</span>` : ''}
+                    ${oppStyle && oppStyle.id !== 'balanced' ? `<span class="badge" title="${oppStyle.desc}">🎯 ${oppStyle.name}</span>` : ''}
+                    ${oppPerkTags}
                 </div>
                 <div class="oc-scout">
                     <div>❤️ Can: ~${opp.maxHp} | Güç ${opp.stats.strength} / Çev ${opp.stats.agility}</div>
@@ -1008,12 +1036,18 @@
         if (matchInProgress) return;
         const info = ludus.nextDay();
         const isBoss = ludus.state.day % 5 === 0;
+        const injuryNote = (info.healedInjuries && info.healedInjuries.length > 0)
+            ? ` • 🩹 Revirde iyileşti: ${info.healedInjuries.join(', ')}`
+            : '';
+        const floorNote = info.starvationFloorApplied
+            ? ' (Savaşçı %25 dövüş sınırına toparlandı)'
+            : '';
         if (info.starved) {
-            showToast(`⚠️ Erzak parası yetmedi (-🪙${info.upkeep})! Kadro yarı yarıya iyileşti.`, true);
+            showToast(`⚠️ Erzak parası yetmedi (-🪙${info.upkeep})! Kadro az iyileşti${floorNote}.`, true);
         } else if (isBoss) {
-            showToast(`👑 Gün ${ludus.state.day}: ŞAMPİYONA BOSS GÜNÜ! (-🪙${info.upkeep})`);
+            showToast(`👑 Gün ${ludus.state.day}: ŞAMPİYONA BOSS GÜNÜ! (-🪙${info.upkeep})${injuryNote}`);
         } else {
-            showToast(`Gün ${ludus.state.day} başladı! (-🪙${info.upkeep} masraf)`);
+            showToast(`Gün ${ludus.state.day} başladı! (-🪙${info.upkeep} masraf)${injuryNote}${floorNote}`);
         }
         renderAll();
     });

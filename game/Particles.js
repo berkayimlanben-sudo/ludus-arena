@@ -12,6 +12,7 @@
                     type: 'blood',
                     x,
                     y: y - 38 + (Math.random() - 0.5) * 20,
+                    groundY: y,
                     vx: dir * (60 + Math.random() * 140) + (Math.random() - 0.5) * 60,
                     vy: -80 - Math.random() * 140,
                     size: 2.5 + Math.random() * 3.5,
@@ -94,8 +95,9 @@
                 p.x += p.vx * delta;
                 p.y += p.vy * delta;
 
-                if (p.y > 355 && p.type === 'blood') {
-                    p.y = 355;
+                const floorY = p.groundY !== undefined ? p.groundY : 355;
+                if (p.y > floorY && p.type === 'blood') {
+                    p.y = floorY;
                     p.vx *= 0.2;
                     p.vy = 0;
                 }

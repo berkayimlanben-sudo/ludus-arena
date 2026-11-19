@@ -98,7 +98,7 @@
             icon: '🩹',
             maxLevel: 5,
             baseCost: 90,
-            desc: 'Gün bitiminde ücretsiz can yenilenmesini artırır ve tedaviyi ucuzlatır.'
+            desc: 'Gün bitiminde can yenilenmesini artırır, tedaviyi ucuzlatır ve Sv.2+ ile gecede sakatlık iyileştirme şansı verir.'
         },
         blacksmith: {
             id: 'blacksmith',
@@ -147,6 +147,8 @@
         {
             name: 'Brutus (Kolezyum Kasabı)',
             traitId: 'berserker',
+            styleId: 'aggressive',
+            perks: ['heavy_hand', 'executioner'],
             weaponId: 'axe',
             shieldId: 'none',
             armorId: 'plate',
@@ -157,6 +159,8 @@
         {
             name: 'Draven (Gölge Avcısı)',
             traitId: 'fierce',
+            styleId: 'skirmisher',
+            perks: ['blood_scent', 'swift_foot'],
             weaponId: 'dagger',
             shieldId: 'parma',
             armorId: 'chain',
@@ -167,6 +171,8 @@
         {
             name: 'Theokoles (Ölümsüz Dev)',
             traitId: 'iron_skin',
+            styleId: 'counter',
+            perks: ['iron_will', 'shield_master'],
             weaponId: 'mace',
             shieldId: 'scutum',
             armorId: 'plate',

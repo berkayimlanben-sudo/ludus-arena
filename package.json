@@ -1,6 +1,6 @@
 {
   "name": "ludus-arena",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "description": "Ludus Arena — 2D Gladiator Management & Auto-Battler",
   "main": "server.js",
@@ -8,7 +8,8 @@
     "dev": "node server.js",
     "start": "node server.js",
     "build": "node -e \"console.log('Static site ready')\"",
-    "lint": "find engine data game -name '*.js' -exec node --check {} + && node --check server.js"
+    "lint": "find engine data game -name '*.js' -exec node --check {} + && node --check server.js",
+    "test": "node --test tests/*.test.js"
   },
   "dependencies": {
     "express": "^5.3.0"
