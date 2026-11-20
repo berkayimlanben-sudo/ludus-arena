@@ -43,6 +43,7 @@
     const arena2v2SynergyBar = document.getElementById('arena-2v2-synergy-bar');
     const careerLadderPanel = document.getElementById('career-ladder-panel');
     const senatePanel = document.getElementById('senate-panel');
+    const nemesisPanel = document.getElementById('nemesis-panel');
     const arenaBettingPanel = document.getElementById('arena-betting-panel');
     const arenaOpponentsList = document.getElementById('arena-opponents-list');
     let selectedBet = { type: 'none', stake: 50 };
@@ -878,6 +879,7 @@
 
         renderCareerLadder();
         renderSenatePanel();
+        renderNemesisPanel();
         renderBettingPanel();
 
         arenaOpponentsList.innerHTML = '';
@@ -897,7 +899,8 @@
             const cardClass = [
                 'opp-card',
                 opp.isBoss ? 'boss-card' : '',
-                opp.lethal && !opp.isBoss ? 'lethal-card' : '',
+                opp.isNemesis ? 'nemesis-card' : '',
+                opp.lethal && !opp.isBoss && !opp.isNemesis ? 'lethal-card' : '',
                 opp.ruleId === 'team_2v2' ? 'team-card' : '',
                 opp.completed ? 'done' : ''
             ].filter(Boolean).join(' ');
@@ -905,6 +908,10 @@
             const matchTypeTag = opp.lethal
                 ? '<span class="lethal-badge">💀 ÖLÜMÜNE (Kalıcı Ölüm!)</span>'
                 : '<span class="safe-badge">🛡️ Gösteri</span>';
+
+            const schoolTag = opp.schoolName
+                ? `<span class="school-badge">${opp.schoolIcon || '⚔️'} ${opp.schoolName}</span>`
+                : '';
 
             const ruleTag = opp.ruleId !== 'standard'
                 ? `<span class="rule-badge">${rule.name}</span>`
@@ -918,6 +925,17 @@
                 const pPerks = (opp.partner.perks || []).map(pid => Data.PERKS[pid] ? Data.PERKS[pid].name : '').filter(Boolean);
                 const pExtra = [pStyle ? pStyle.name : '', ...pPerks].filter(Boolean).join(' • ');
                 partnerHTML = `<div class="partner-line">➕ Ortak: <b>${opp.partner.name}</b> (~${opp.partner.maxHp} Can, ${pw.name}${ps.hasShield ? '+' + ps.name : ''}${pExtra ? ` • ${pExtra}` : ''})</div>`;
+            }
+
+            let nemesisHTML = '';
+            if (opp.isNemesis) {
+                const victimsText = (opp.nemesisVictims && opp.nemesisVictims.length > 0)
+                    ? ` • Kurbanlar: ${opp.nemesisVictims.join(', ')}`
+                    : '';
+                nemesisHTML = `
+                    <div class="nemesis-victim-line">🩸 ${opp.nemesisTitle || 'Kan Davası'}${victimsText}</div>
+                    ${opp.nemesisTaunt ? `<div class="nemesis-taunt-line">"${opp.nemesisTaunt}"</div>` : ''}
+                `;
             }
 
             let bribeHTML = '';
@@ -969,6 +987,7 @@
                 </div>
                 <div class="rc-tags">
                     ${matchTypeTag}
+                    ${schoolTag}
                     ${ruleTag}
                     ${trait ? `<span class="trait-badge">${trait.name}</span>` : ''}
                     ${oppStyle && oppStyle.id !== 'balanced' ? `<span class="badge" title="${oppStyle.desc}">🎯 ${oppStyle.name}</span>` : ''}
@@ -979,12 +998,13 @@
                     <div>⚔️ ${w.name}${s.hasShield ? ' + ' + s.name : ''}</div>
                     <div>🛡️ ${a.name}${h.id !== 'none' ? ' + ' + h.name : ''}</div>
                     ${partnerHTML}
+                    ${nemesisHTML}
                     ${oddsHTML}
                 </div>
                 ${bribeHTML}
                 <div class="oc-reward">Ödül: 🪙${opp.rewardGold} Altın • 🏛️ +${opp.rewardFame} Şöhret</div>
                 <button class="primary-btn fight-start-btn" ${opp.completed ? 'disabled' : ''}>
-                    ${opp.completed ? '✔️ Tamamlandı' : (opp.isBoss ? '👑 BOSS İLE KAPIŞ!' : (opp.ruleId === 'team_2v2' ? '⚔️ 2v2 MAÇA ÇIK!' : (opp.lethal ? '💀 ÖLÜMÜNE ÇIK!' : '⚔️ Arenaya Çık!')))}
+                    ${opp.completed ? '✔️ Tamamlandı' : (opp.isBoss ? '👑 BOSS İLE KAPIŞ!' : (opp.isNemesis ? '🩸 İNTİKAM DÜELLOSU!' : (opp.ruleId === 'team_2v2' ? '⚔️ 2v2 MAÇA ÇIK!' : (opp.lethal ? '💀 ÖLÜMÜNE ÇIK!' : '⚔️ Arenaya Çık!'))))}
                 </button>
             `;
 
@@ -1158,6 +1178,66 @@
                 renderAll();
             });
         }
+    }
+
+    function renderNemesisPanel() {
+        if (!nemesisPanel || !Game.NemesisRules || !Data.RIVAL_LUDUSES || !ludus.state.nemesis) return;
+        const nemState = ludus.state.nemesis;
+        const schoolsState = nemState.schools || {};
+        const activeNemeses = (nemState.nemeses || []).filter(n => !n.defeated);
+        const defeatedCount = nemState.defeatedNemesisCount || 0;
+
+        const schoolsHtml = Object.values(Data.RIVAL_LUDUSES).map(def => {
+            const st = schoolsState[def.id] || { rivalry: def.baseRivalry || 15, winsAgainst: 0, lossesAgainst: 0 };
+            const tier = Game.NemesisRules.getSchoolRivalryTier(st.rivalry);
+            const bonusHint = tier.rewardMult > 1 ? ` · +%${Math.round((tier.rewardMult - 1) * 100)} Ödül` : '';
+            return `
+                <div class="school-card ${tier.id}">
+                    <div class="school-card-top">
+                        <span>${def.icon} ${def.name}</span>
+                        <span class="school-rivalry-val">${st.rivalry}/100</span>
+                    </div>
+                    <div class="school-motto">"${def.motto}"</div>
+                    <div class="school-meta">
+                        <span>${tier.label}${bonusHint}</span>
+                        <span>${st.winsAgainst || 0}G / ${st.lossesAgainst || 0}M</span>
+                    </div>
+                    <div class="school-rivalry-bar"><div class="school-rivalry-fill" style="width:${Math.max(0, Math.min(100, st.rivalry))}%"></div></div>
+                </div>
+            `;
+        }).join('');
+
+        let nemesesHtml = '';
+        if (activeNemeses.length === 0) {
+            nemesesHtml = `<div class="nemesis-empty">Şu an aktif Kan Davası yok. Ölümüne maçlarda gladyatörünü deviren veya seni yenen rakipler isimlenip intikam düellosuna çıkar.</div>`;
+        } else {
+            nemesesHtml = `<div class="nemesis-list">${activeNemeses.map(n => {
+                const schoolDef = Data.RIVAL_LUDUSES[n.schoolId] || { icon: '🩸', shortName: 'Rakip Okul' };
+                const rankInfo = Game.NemesisRules.getNemesisRankInfo(n.rank);
+                const w = Data.WEAPONS[n.weaponId];
+                const victims = (n.victims && n.victims.length > 0) ? ` • Kurbanlar: ${n.victims.join(', ')}` : '';
+                return `
+                    <div class="nemesis-dossier-card">
+                        <div class="nemesis-dossier-top">
+                            <strong>${schoolDef.icon} ${n.name}</strong>
+                            <span class="nemesis-rank-tag">${rankInfo.label}</span>
+                        </div>
+                        <div class="nemesis-dossier-meta">${n.title}${victims}</div>
+                        <div class="nemesis-dossier-meta">${schoolDef.shortName} • ❤️ ${n.maxHp} Can • ⚔️ ${w ? w.name : 'Silah'} • Güç ${n.stats.strength} / Çev ${n.stats.agility}</div>
+                        <div class="nemesis-dossier-taunt">"${n.taunt}"</div>
+                    </div>
+                `;
+            }).join('')}</div>`;
+        }
+
+        nemesisPanel.innerHTML = `
+            <div class="nemesis-head">
+                <strong>🩸 Rakip Ludus'lar & Kan Davası (Nemesis)</strong>
+                <span>Aktif Kan Davası: ${activeNemeses.length}/4 • Kapanan Kan Davası: 🏆 ${defeatedCount}</span>
+            </div>
+            <div class="schools-grid">${schoolsHtml}</div>
+            ${nemesesHtml}
+        `;
     }
 
     function openChampionModal(fighterId, res) {
@@ -1335,6 +1415,9 @@
             name: g.name,
             skinColor: g.skinColor,
             isBoss,
+            isNemesis: Boolean(g.isNemesis),
+            schoolName: g.schoolName || null,
+            nemesisTaunt: g.nemesisTaunt || null,
             currentHp: g.currentHp,
             fatigue: g.fatigue || 0,
             fightStyle: g.styleId || 'balanced',
@@ -1529,24 +1612,38 @@
                     ? ` • 💬 İSTEK TAMAMLANDI: ${res.fulfilledRequests.map(r => r.name).join(', ')}!`
                     : '';
 
+                let nemesisNote = '';
+                if (res.nemesisEvent) {
+                    if (res.nemesisEvent.type === 'defeated') {
+                        nemesisNote = ` • 🩸 KAN DAVASI KAPANDI: ${res.nemesisEvent.name} devrildi! (+${res.nemesisEvent.rosterLoyaltyBonus} Kadro Sadakati, +25 XP)`;
+                    } else if (res.nemesisEvent.type === 'created' && res.nemesisEvent.nemesis) {
+                        nemesisNote = ` • 🩸 YENİ KAN DAVASI: ${res.nemesisEvent.nemesis.name} (${res.nemesisEvent.nemesis.title})!`;
+                    } else if (res.nemesisEvent.type === 'upgraded' && res.nemesisEvent.nemesis) {
+                        nemesisNote = ` • 💀 KAN DAVASI BÜYÜDÜ: ${res.nemesisEvent.nemesis.name} (Sv.${res.nemesisEvent.nemesis.rank})!`;
+                    }
+                }
+                const schoolNote = (res.schoolUpdate && res.schoolUpdate.promotedTier)
+                    ? ` • 🔥 ${(Data.RIVAL_LUDUSES && Data.RIVAL_LUDUSES[res.schoolUpdate.schoolId] ? Data.RIVAL_LUDUSES[res.schoolUpdate.schoolId].shortName : 'Rakip Okul')}: ${res.schoolUpdate.promotedTier.label}!`
+                    : '';
+
                 if (didWin) {
                     const lvlMsg = res.leveledNames.length > 0 ? ` 🌟 SEVİYE ATLADI: ${res.leveledNames.join(', ')}!` : '';
                     const promoMsg = res.promotedRegion ? ` • 🗺️ YENİ BÖLGE: ${res.promotedRegion.icon} ${res.promotedRegion.name}!` : '';
-                    winnerText.textContent = `🏆 ZAFER! +${res.goldEarned} Altın, +${res.fameEarned} Şöhret (+${res.xpReward} XP)${lvlMsg}${promoMsg}${sparsioNote}${contractNote}${bribeNote}${betNote}${relNote}${reqNote}`;
+                    winnerText.textContent = `🏆 ZAFER! +${res.goldEarned} Altın, +${res.fameEarned} Şöhret (+${res.xpReward} XP)${lvlMsg}${promoMsg}${sparsioNote}${contractNote}${bribeNote}${betNote}${relNote}${reqNote}${nemesisNote}${schoolNote}`;
                 } else if (res.sparedNames && res.sparedNames.length > 0 && res.deadNames.length === 0) {
                     const injTxt = res.injuries.length > 0 ? ` • 🩹 ${res.injuries[0]}` : '';
-                    winnerText.textContent = `👍 MISSIO! İmparator başparmağını YUKARI kaldırdı — ${res.sparedNames.join(', ')} bağışlandı (1 Can, +15 Sadakat)! (+${res.goldEarned} Altın, +${res.xpReward} XP${injTxt})${bribeNote}${betNote}${relNote}`;
+                    winnerText.textContent = `👍 MISSIO! İmparator başparmağını YUKARI kaldırdı — ${res.sparedNames.join(', ')} bağışlandı (1 Can, +15 Sadakat)! (+${res.goldEarned} Altın, +${res.xpReward} XP${injTxt})${bribeNote}${betNote}${relNote}${nemesisNote}${schoolNote}`;
                 } else if (res.deadNames.length > 0) {
                     const rookieMsg = res.rescuedByRookie ? ' (Sokaktan yeni bir çaylak katıldı!)' : '';
                     const sparedMsg = (res.sparedNames && res.sparedNames.length > 0) ? ` • 👍 ${res.sparedNames.join(', ')} İmparator tarafından bağışlandı!` : '';
                     const downPollice = (res.polliceResults && res.polliceResults.find(p => p.eligible && !p.spared));
                     const polliceMsg = downPollice ? ` (${downPollice.summary})` : '';
-                    winnerText.textContent = `⚰️ ${res.deadNames.join(', ')} ARENADA CAN VERDİ!${polliceMsg}${sparedMsg}${rookieMsg}${bribeNote}${betNote}`;
+                    winnerText.textContent = `⚰️ ${res.deadNames.join(', ')} ARENADA CAN VERDİ!${polliceMsg}${sparedMsg}${rookieMsg}${bribeNote}${betNote}${nemesisNote}${schoolNote}`;
                 } else if (res.bribeResult && res.bribeResult.keptDeal && res.bribeResult.type === 'throw_match') {
                     winnerText.textContent = `🎭 ŞİKE MAÇI BİTTİ! ${res.bribeResult.summary} (+${res.xpReward} XP)${betNote}`;
                 } else {
                     const injTxt = res.injuries.length > 0 ? ` • 🩹 ${res.injuries[0]}` : '';
-                    winnerText.textContent = `💀 YENİLGİ! (+${res.goldEarned} Altın, +${res.xpReward} XP${injTxt})${bribeNote}${betNote}${relNote}`;
+                    winnerText.textContent = `💀 YENİLGİ! (+${res.goldEarned} Altın, +${res.xpReward} XP${injTxt})${bribeNote}${betNote}${relNote}${nemesisNote}${schoolNote}`;
                 }
                 winnerBanner.classList.remove('hidden');
             });
@@ -1830,6 +1927,15 @@
             if (!sel) return;
             const req = ludus.devGenerateRequest(sel.id);
             showToast(req ? `💬 Test: ${sel.name} için istek üretildi: ${req.title}` : 'İstek üretilemedi.', !req);
+            renderAll();
+        });
+    }
+    const devSpawnNemesisBtn = document.getElementById('dev-spawn-nemesis');
+    if (devSpawnNemesisBtn) {
+        devSpawnNemesisBtn.addEventListener('click', () => {
+            if (matchInProgress) return;
+            const res = ludus.devSpawnNemesis();
+            showToast(res ? `🩸 Test: ${res.nemesis.name} (${res.nemesis.title}) Kan Davası başlattı! Arena sekmesine bak.` : 'Kan davası üretilemedi.', !res);
             renderAll();
         });
     }

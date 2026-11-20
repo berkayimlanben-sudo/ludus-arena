@@ -72,6 +72,9 @@
                 pendingEvent: null,
                 bettingStats: { totalWagered: 0, totalWon: 0, betsWon: 0, betsLost: 0 },
                 crowdStats: { totalSparsioGold: 0, polliceMercies: 0 },
+                nemesis: Game.NemesisRules
+                    ? Game.NemesisRules.createDefaultNemesisState(Data.RIVAL_LUDUSES)
+                    : { schools: {}, nemeses: [], defeatedNemesisCount: 0 },
                 marketRecruits: [],
                 dailyOpponents: []
             };
@@ -138,6 +141,30 @@
             if (!this.state.crowdStats) {
                 this.state.crowdStats = { totalSparsioGold: 0, polliceMercies: 0 };
             }
+            if (!this.state.nemesis) {
+                this.state.nemesis = Game.NemesisRules
+                    ? Game.NemesisRules.createDefaultNemesisState(Data.RIVAL_LUDUSES)
+                    : { schools: {}, nemeses: [], defeatedNemesisCount: 0 };
+            }
+            if (!this.state.nemesis.schools) {
+                this.state.nemesis.schools = Game.NemesisRules
+                    ? Game.NemesisRules.createDefaultNemesisState(Data.RIVAL_LUDUSES).schools
+                    : {};
+            }
+            if (Data.RIVAL_LUDUSES) {
+                Object.values(Data.RIVAL_LUDUSES).forEach(def => {
+                    if (!this.state.nemesis.schools[def.id]) {
+                        this.state.nemesis.schools[def.id] = {
+                            id: def.id,
+                            rivalry: def.baseRivalry || 15,
+                            winsAgainst: 0,
+                            lossesAgainst: 0
+                        };
+                    }
+                });
+            }
+            if (!Array.isArray(this.state.nemesis.nemeses)) this.state.nemesis.nemeses = [];
+            if (this.state.nemesis.defeatedNemesisCount === undefined) this.state.nemesis.defeatedNemesisCount = 0;
 
             const ensureGlad = (obj) => {
                 if (!obj.traitId) obj.traitId = pickRandomKey(Data.TRAITS);
@@ -175,6 +202,8 @@
                 if (!opp.ruleId) opp.ruleId = 'standard';
                 if (opp.partner === undefined) opp.partner = null;
                 if (opp.bribeOffer === undefined) opp.bribeOffer = null;
+                if (opp.schoolId === undefined) opp.schoolId = null;
+                if (opp.isNemesis === undefined) opp.isNemesis = false;
                 if (opp.partner) ensureGlad(opp.partner);
             });
         }
@@ -386,7 +415,7 @@
             const perkHp = perks.includes('iron_will') ? 20 : 0;
             const maxHp = 80 + stats.vitality * 6 + armorObj.hpBonus + perkHp;
 
-            return {
+            let fighter = {
                 name: pickRandom(Data.GLADIATOR_NAMES),
                 skinColor: pickRandom(Data.SKIN_TONES),
                 traitId: pickRandomKey(Data.TRAITS),
@@ -399,6 +428,21 @@
                 helmetId,
                 maxHp
             };
+
+            if (Game.NemesisRules && Data.RIVAL_LUDUSES) {
+                const schoolDef = Game.NemesisRules.pickSchoolForEnemy(
+                    Data.RIVAL_LUDUSES,
+                    this.state.nemesis && this.state.nemesis.schools
+                );
+                if (schoolDef) {
+                    const riv = (this.state.nemesis && this.state.nemesis.schools && this.state.nemesis.schools[schoolDef.id])
+                        ? this.state.nemesis.schools[schoolDef.id].rivalry
+                        : (schoolDef.baseRivalry || 15);
+                    fighter = Game.NemesisRules.applySchoolProfileToFighter(fighter, schoolDef, riv);
+                    fighter.maxHp = 80 + fighter.stats.vitality * 6 + armorObj.hpBonus + perkHp;
+                }
+            }
+            return fighter;
         }
 
         _create2v2Contract(tier) {
@@ -414,6 +458,10 @@
                 id: 'opp2v2_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
                 isBoss: false,
                 lethal: false,
+                isNemesis: false,
+                schoolId: f1.schoolId || null,
+                schoolName: f1.schoolName || null,
+                schoolIcon: f1.schoolIcon || null,
                 ruleId: 'team_2v2',
                 tierName: tier.name,
                 badge: '2v2',
@@ -530,6 +578,27 @@
 
                 const tier = activeTiers[Math.min(i, activeTiers.length - 1)];
 
+                // Aktif Kan Davası (Nemesis) varsa Boss olmayan günlerin 3. slotunda intikam düellosuna çıkar
+                if (i === 2 && !isBossDay && Game.NemesisRules && this.state.nemesis) {
+                    const activeNem = Game.NemesisRules.pickActiveNemesisForDay(this.state.nemesis);
+                    if (activeNem) {
+                        const schoolDef = Data.RIVAL_LUDUSES ? Data.RIVAL_LUDUSES[activeNem.schoolId] : null;
+                        const nemOpp = Game.NemesisRules.buildNemesisOpponent(
+                            activeNem,
+                            schoolDef,
+                            region,
+                            tier,
+                            ngStat,
+                            ngReward,
+                            Data.ARMORS
+                        );
+                        if (nemOpp) {
+                            this.state.dailyOpponents.push(nemOpp);
+                            continue;
+                        }
+                    }
+                }
+
                 // Kadroda 2+ gladyatör varsa 2. slot 2v2 Takım Savaşı olur!
                 if (i === 1 && this.state.roster.length >= 2) {
                     this.state.dailyOpponents.push(this._create2v2Contract(tier));
@@ -554,10 +623,20 @@
                     rewardGold = Math.round(rewardGold * 2.2);
                     rewardFame = Math.round(rewardFame * 2.2);
                 }
+                if (Game.NemesisRules && f.schoolId && this.state.nemesis && this.state.nemesis.schools) {
+                    const st = this.state.nemesis.schools[f.schoolId];
+                    const rivTier = Game.NemesisRules.getSchoolRivalryTier(st ? st.rivalry : 0);
+                    rewardGold = Math.round(rewardGold * rivTier.rewardMult);
+                    rewardFame += rivTier.bonusFame;
+                }
 
                 this.state.dailyOpponents.push({
                     id: 'opp_' + i + '_' + Date.now(),
                     isBoss: false,
+                    isNemesis: false,
+                    schoolId: f.schoolId || null,
+                    schoolName: f.schoolName || null,
+                    schoolIcon: f.schoolIcon || null,
                     lethal: isLethal,
                     ruleId,
                     tierName: tier.name,
@@ -891,6 +970,40 @@
             const next = Game.RelationRules.adjustRelation(g1, g2, delta);
             this.saveToLocalStorage();
             return next;
+        }
+
+        devSpawnNemesis() {
+            if (!Game.NemesisRules) return null;
+            if (!this.state.nemesis) {
+                this.state.nemesis = Game.NemesisRules.createDefaultNemesisState(Data.RIVAL_LUDUSES);
+            }
+            const region = this.getCurrentRegion();
+            const tier = Data.ARENA_TIERS.filter(t => this.state.fame >= t.minFame).pop() || Data.ARENA_TIERS[0];
+            const base = this._generateEnemyFighter(tier, 1.0, 'standard');
+            const created = Game.NemesisRules.createOrUpgradeNemesis({
+                nemesisState: this.state.nemesis,
+                opp: base,
+                victims: ['Eski Şampiyon'],
+                reason: 'slayer',
+                day: this.state.day,
+                rivalDefs: Data.RIVAL_LUDUSES,
+                epithets: Data.NEMESIS_EPITHETS,
+                perksDict: Data.PERKS,
+                armorsDict: Data.ARMORS
+            });
+            if (!created || !created.nemesis) return null;
+            const nem = created.nemesis;
+            const schoolDef = Data.RIVAL_LUDUSES ? Data.RIVAL_LUDUSES[nem.schoolId] : null;
+            const ngStat = Game.CareerRules ? Game.CareerRules.getNgPlusEnemyScale(this.state.ngPlusCount) : 1.0;
+            const ngReward = Game.CareerRules ? Game.CareerRules.getNgPlusRewardScale(this.state.ngPlusCount) : 1.0;
+            const nemOpp = Game.NemesisRules.buildNemesisOpponent(
+                nem, schoolDef, region, tier, ngStat, ngReward, Data.ARMORS
+            );
+            if (nemOpp) {
+                this.state.dailyOpponents[2] = nemOpp;
+            }
+            this.saveToLocalStorage();
+            return { nemesis: nem, opp: nemOpp };
         }
 
         getTrainingCost(g, statKey) {
@@ -1622,6 +1735,65 @@
 
             const betResult = this._resolveAndApplyBet(matchMeta.activeBet, didWin, matchMeta.durationSec || 0);
 
+            let schoolUpdate = null;
+            let nemesisEvent = null;
+            if (Game.NemesisRules && opp) {
+                if (!this.state.nemesis) {
+                    this.state.nemesis = Game.NemesisRules.createDefaultNemesisState(Data.RIVAL_LUDUSES);
+                }
+                if (opp.schoolId) {
+                    schoolUpdate = Game.NemesisRules.recordSchoolMatchOutcome(this.state.nemesis, opp.schoolId, didWin);
+                }
+                if (didWin && opp.nemesisId) {
+                    const defRes = Game.NemesisRules.resolveNemesisDefeat(this.state.nemesis, opp.nemesisId);
+                    if (defRes) {
+                        fameEarned += defRes.bonusFame;
+                        for (const member of this.state.roster) {
+                            if (Game.BondingRules) {
+                                member.loyalty = Game.BondingRules.clampLoyalty((member.loyalty ?? 65) + defRes.rosterLoyaltyBonus);
+                            }
+                            if (this.grantXp(member, 25) && !leveledNames.includes(member.name)) {
+                                leveledNames.push(member.name);
+                            }
+                        }
+                        nemesisEvent = Object.assign({ type: 'defeated' }, defRes);
+                    }
+                } else if (!didWin && !isIntentionalThrow && !opp.isBoss && !opp.isTournament) {
+                    const rollNem = matchMeta.nemesisRollFn || Math.random;
+                    if (deadNames.length > 0) {
+                        const res = Game.NemesisRules.createOrUpgradeNemesis({
+                            nemesisState: this.state.nemesis,
+                            opp,
+                            victims: deadNames,
+                            reason: 'slayer',
+                            day: this.state.day,
+                            rivalDefs: Data.RIVAL_LUDUSES,
+                            epithets: Data.NEMESIS_EPITHETS,
+                            perksDict: Data.PERKS,
+                            armorsDict: Data.ARMORS
+                        }, rollNem);
+                        if (res && res.nemesis) {
+                            nemesisEvent = { type: res.action, reason: 'slayer', nemesis: res.nemesis };
+                        }
+                    } else if (opp.nemesisId || rollNem() < (opp.lethal ? 0.65 : 0.45)) {
+                        const res = Game.NemesisRules.createOrUpgradeNemesis({
+                            nemesisState: this.state.nemesis,
+                            opp,
+                            victims: [],
+                            reason: 'humiliation',
+                            day: this.state.day,
+                            rivalDefs: Data.RIVAL_LUDUSES,
+                            epithets: Data.NEMESIS_EPITHETS,
+                            perksDict: Data.PERKS,
+                            armorsDict: Data.ARMORS
+                        }, rollNem);
+                        if (res && res.nemesis) {
+                            nemesisEvent = { type: res.action, reason: 'humiliation', nemesis: res.nemesis };
+                        }
+                    }
+                }
+            }
+
             this.state.gold = Math.max(0, this.state.gold + goldEarned);
             this.state.fame = Math.max(0, this.state.fame + fameEarned);
             const promotedRegion = this._syncRegionAfterFameGain();
@@ -1642,7 +1814,9 @@
                 contractCompleted,
                 bribeResult,
                 relationUpdate,
-                betResult
+                betResult,
+                schoolUpdate,
+                nemesisEvent
             };
         }
 
@@ -1833,6 +2007,19 @@
                 pendingEvent: null,
                 bettingStats: this.state.bettingStats || { totalWagered: 0, totalWon: 0, betsWon: 0, betsLost: 0 },
                 crowdStats: this.state.crowdStats || { totalSparsioGold: 0, polliceMercies: 0 },
+                nemesis: (() => {
+                    const fresh = Game.NemesisRules
+                        ? Game.NemesisRules.createDefaultNemesisState(Data.RIVAL_LUDUSES)
+                        : { schools: {}, nemeses: [], defeatedNemesisCount: 0 };
+                    const prevSchools = (this.state.nemesis && this.state.nemesis.schools) || {};
+                    Object.keys(fresh.schools).forEach(sid => {
+                        if (prevSchools[sid]) {
+                            fresh.schools[sid].rivalry = Math.max(10, Math.round((prevSchools[sid].rivalry || 15) * 0.5));
+                        }
+                    });
+                    fresh.defeatedNemesisCount = (this.state.nemesis && this.state.nemesis.defeatedNemesisCount) || 0;
+                    return fresh;
+                })(),
                 marketRecruits: [],
                 dailyOpponents: []
             };

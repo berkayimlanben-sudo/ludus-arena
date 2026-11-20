@@ -1727,3 +1727,203 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
     font-variant-numeric: tabular-nums;
 }
+
+/* v0.9.9 RAKİP LUDUS'LAR & KAN DAVASI (NEMESİS) */
+.nemesis-panel {
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border-color: #6b2222;
+}
+
+.nemesis-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.nemesis-head strong {
+    font-size: 14px;
+    color: #ff8787;
+}
+
+.nemesis-head span {
+    font-size: 11px;
+    color: #d6c8b4;
+    font-variant-numeric: tabular-nums;
+}
+
+.schools-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+@media (max-width: 780px) {
+    .schools-grid { grid-template-columns: 1fr; }
+}
+
+.school-card {
+    background: #171111;
+    border: 1px solid #452626;
+    border-radius: 7px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.school-card.heated {
+    border-color: #9c5718;
+}
+
+.school-card.blood_feud {
+    border-color: #a61e1e;
+    background: #1d1011;
+}
+
+.school-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #f3ead8;
+}
+
+.school-rivalry-val {
+    font-size: 11px;
+    font-weight: 700;
+    color: #ffa8a8;
+    background: #311515;
+    border: 1px solid #7a2626;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-variant-numeric: tabular-nums;
+}
+
+.school-motto {
+    font-size: 10px;
+    color: #b8a58d;
+    font-style: italic;
+}
+
+.school-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    color: #d6c8b4;
+    font-variant-numeric: tabular-nums;
+}
+
+.school-rivalry-bar {
+    height: 5px;
+    background: #0d0909;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 2px;
+}
+
+.school-rivalry-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #9c4a1a, #e03131);
+}
+
+.nemesis-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 8px;
+}
+
+.nemesis-empty {
+    font-size: 12px;
+    color: #b8a58d;
+    background: #141010;
+    border: 1px dashed #4a2a2a;
+    border-radius: 6px;
+    padding: 8px 10px;
+}
+
+.nemesis-dossier-card {
+    background: linear-gradient(180deg, #241214 0%, #140d0e 100%);
+    border: 1px solid #962626;
+    border-radius: 7px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.nemesis-dossier-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #ffe3e3;
+}
+
+.nemesis-rank-tag {
+    font-size: 10px;
+    font-weight: 700;
+    color: #ff8787;
+    background: #361215;
+    border: 1px solid #962626;
+    border-radius: 4px;
+    padding: 1px 6px;
+}
+
+.nemesis-dossier-meta {
+    font-size: 11px;
+    color: #e6d8c3;
+    font-variant-numeric: tabular-nums;
+}
+
+.nemesis-dossier-taunt {
+    font-size: 11px;
+    color: #ffb8b8;
+    font-style: italic;
+}
+
+.school-badge {
+    font-size: 11px;
+    font-weight: 600;
+    color: #ead7b7;
+    background: #1f1914;
+    border: 1px solid #4a3a2a;
+    border-radius: 4px;
+    padding: 1px 6px;
+}
+
+.opp-card.nemesis-card {
+    border: 2px solid #b52b2b;
+    background: linear-gradient(180deg, #271113 0%, #150d0e 100%);
+}
+
+.opp-card.nemesis-card .fight-start-btn {
+    background: #7c1c1c;
+    border-color: #d94141;
+    color: #fff5f5;
+}
+
+.opp-card.nemesis-card .fight-start-btn:hover:not(:disabled) {
+    background: #9c2525;
+}
+
+.nemesis-victim-line {
+    font-size: 11px;
+    font-weight: 700;
+    color: #ff8787;
+    margin-top: 2px;
+}
+
+.nemesis-taunt-line {
+    font-size: 11px;
+    color: #f3c6c6;
+    font-style: italic;
+}

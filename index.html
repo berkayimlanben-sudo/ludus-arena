@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ludus Arena — Gladyatör Yönetimi (v0.9.8)</title>
+    <title>Ludus Arena — Gladyatör Yönetimi (v0.9.9)</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="game-wrapper">
         <header class="top-bar">
-            <div class="brand">⚔️ LUDUS ARENA <span class="badge">v0.9.8 Seyirci & Pollice Verso</span></div>
+            <div class="brand">⚔️ LUDUS ARENA <span class="badge">v0.9.9 Kan Davası & Rakip Okullar</span></div>
 
             <div class="resource-bar">
                 <span id="ui-day" class="res-pill">Gün 1</span>
@@ -46,6 +46,7 @@
             <button id="dev-spawn-bribe">🤫 Şike Teklifi</button>
             <button id="dev-low-loyalty">😠 Sadakat -30</button>
             <button id="dev-new-request">💬 İstek Üret</button>
+            <button id="dev-spawn-nemesis">🩸 Kan Davası Aç</button>
         </div>
 
         <nav class="tab-nav">
@@ -114,6 +115,7 @@
                 </div>
                 <div id="career-ladder-panel" class="panel-box career-ladder-panel"></div>
                 <div id="senate-panel" class="panel-box senate-panel"></div>
+                <div id="nemesis-panel" class="panel-box nemesis-panel"></div>
                 <div id="arena-betting-panel" class="panel-box arena-betting-panel"></div>
                 <div id="arena-opponents-list" class="opponents-grid"></div>
             </div>
@@ -271,6 +273,7 @@
     <!-- Oyun & Yönetim -->
     <script src="game/CombatRules.js"></script>
     <script src="game/CrowdRules.js"></script>
+    <script src="game/NemesisRules.js"></script>
     <script src="game/Gladiator.js"></script>
     <script src="game/ArenaScene.js"></script>
     <script src="game/LudusScene.js"></script>

@@ -485,4 +485,57 @@
             repReward: 18
         }
     ];
+
+    Data.RIVAL_LUDUSES = {
+        batiatus: {
+            id: 'batiatus',
+            name: 'House of Batiatus',
+            shortName: 'Batiatus Okulu',
+            icon: '🦁',
+            color: '#d4af37',
+            motto: 'Altın, çelik ve şan.',
+            preferredWeapons: ['sword', 'mace'],
+            preferredStyles: ['counter', 'balanced'],
+            preferredTraits: ['disciplined', 'iron_skin'],
+            preferredPerks: ['shield_master', 'second_wind'],
+            baseRivalry: 20
+        },
+        magnus: {
+            id: 'magnus',
+            name: 'Ludus Magnus',
+            shortName: 'Ludus Magnus',
+            icon: '🦅',
+            color: '#c83e37',
+            motto: 'İmparatorluğun demir yumruğu.',
+            preferredWeapons: ['axe', 'mace', 'sword'],
+            preferredStyles: ['aggressive', 'counter'],
+            preferredTraits: ['berserker', 'iron_skin'],
+            preferredPerks: ['heavy_hand', 'iron_will', 'executioner'],
+            baseRivalry: 12
+        },
+        solonis: {
+            id: 'solonis',
+            name: 'Schola Solonis',
+            shortName: 'Solonis Okulu',
+            icon: '🐍',
+            color: '#2b8a3e',
+            motto: 'Hız, zehir ve acımasızlık.',
+            preferredWeapons: ['trident', 'spear', 'dagger'],
+            preferredStyles: ['skirmisher', 'aggressive'],
+            preferredTraits: ['nimble', 'fierce'],
+            preferredPerks: ['swift_foot', 'blood_scent'],
+            baseRivalry: 15
+        }
+    };
+
+    Data.NEMESIS_EPITHETS = [
+        'Kızıl Diş',
+        'Kan Biçen',
+        'Mezarcı',
+        'Demir Yumruk',
+        'Gölge Katili',
+        'Kumların Laneti',
+        'Kırık Kalkan',
+        'İntikamcı'
+    ];
 })(window.LudusData = window.LudusData || {});

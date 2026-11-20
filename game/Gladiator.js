@@ -8,6 +8,9 @@
             this.teamColor = config.teamColor || '#c83e37';
             this.skinColor = config.skinColor || '#e0ac82';
             this.isBoss = Boolean(config.isBoss);
+            this.isNemesis = Boolean(config.isNemesis);
+            this.schoolName = config.schoolName || null;
+            this.nemesisTaunt = config.nemesisTaunt || null;
             this.facing = this.team === 'left' ? 1 : -1;
 
             this.trait = config.trait || null;

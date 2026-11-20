@@ -11,7 +11,7 @@ Bu belge, motor katmanı, olay (event) sistemi, sahne döngüsü ve veri akış�
 2. **Statik Veri (`data/`):** `Items.js`, `LudusConfig.js` (`window.LudusData`)
 3. **Yardımcılar (`game/`):** `SoundFX.js`, `Particles.js`
 4. **Görsel Katman (`game/renderers/`):** `ArenaRenderer.js`, `GladiatorRenderer.js`, `LudusRenderer.js`
-5. **Saf Kural Modülleri (`game/*Rules.js`):** `CombatRules.js`, `CrowdRules.js`, `Phase7Rules.js`, `CareerRules.js`, `SenateRules.js`, `BondingRules.js`, `RelationAndBetRules.js`
+5. **Saf Kural Modülleri (`game/*Rules.js`):** `CombatRules.js`, `CrowdRules.js`, `NemesisRules.js`, `Phase7Rules.js`, `CareerRules.js`, `SenateRules.js`, `BondingRules.js`, `RelationAndBetRules.js`
 6. **Sahne & Aktörler (`game/`):** `Gladiator.js`, `ArenaScene.js`, `LudusScene.js`
 7. **Durum Yöneticisi (`game/LudusManager.js`):** Tüm oyun durumunu ve kayıt/göç işlemlerini yönetir.
 8. **Uygulama Denetleyicisi (`game/main.js`):** DOM olaylarını, sekme geçişlerini, `ludusTree` ve `tree` örneklerini bağlar.

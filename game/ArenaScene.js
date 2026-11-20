@@ -153,6 +153,10 @@
                 this.onBattleLog.emit(`${syn.tier.badge} SİNERJİSİ (${this.leftTeam[0].gladiatorName} & ${this.leftTeam[1].gladiatorName}): ${syn.tier.desc}`);
             }
             this.rightTeam.forEach(f => {
+                if (f.isNemesis) {
+                    const schoolTxt = f.schoolName ? ` (${f.schoolName})` : '';
+                    this.onBattleLog.emit(`🩸 KAN DAVASI: ${f.gladiatorName}${schoolTxt} intikam ateşiyle arenaya çıktı! "${f.nemesisTaunt || 'Bu kumlar seni de yutacak!'}"`);
+                }
                 if (f.sabotaged) {
                     this.onBattleLog.emit(`🧪 SABOTAJ: ${f.gladiatorName} zehirli şaraptan ötürü bitkin (-%25 Can, -%20 Güç/Hız)!`);
                 }

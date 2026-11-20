@@ -4,7 +4,7 @@
             ctx.save();
             ctx.translate(g.x, g.y);
 
-            const bossScale = g.isBoss ? 1.18 : 1.0;
+            const bossScale = g.isBoss ? 1.18 : (g.isNemesis ? 1.09 : 1.0);
 
             // Zemin gölgesi
             ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
@@ -30,18 +30,20 @@
             const skinFill = flash ? '#ffffff' : g.skinColor;
             const effects = g.activeEffects || {};
 
-            // Dalgalanan Pelerin (Plaka zırhta veya Boss'ta)
-            if (!flash && (g.isBoss || (g.armor && g.armor.style === 'plate'))) {
+            // Dalgalanan Pelerin (Plaka zırhta, Boss'ta veya Kan Davası Nemesis'te)
+            if (!flash && (g.isBoss || g.isNemesis || (g.armor && g.armor.style === 'plate'))) {
                 const capeWave = Math.sin(performance.now() * 0.008 + g.walkPhase) * 5;
-                ctx.fillStyle = g.isBoss ? '#1c1917' : (g.team === 'right' ? '#1e3a5f' : '#5e1414');
+                ctx.fillStyle = g.isBoss
+                    ? '#1c1917'
+                    : (g.isNemesis ? '#6b1111' : (g.team === 'right' ? '#1e3a5f' : '#5e1414'));
                 ctx.beginPath();
                 ctx.moveTo(-8, -55 + breathe);
                 ctx.quadraticCurveTo(-26, -34, -22 + capeWave, -8);
                 ctx.lineTo(-9, -12);
                 ctx.closePath();
                 ctx.fill();
-                if (g.isBoss) {
-                    ctx.strokeStyle = '#d4af37';
+                if (g.isBoss || g.isNemesis) {
+                    ctx.strokeStyle = g.isBoss ? '#d4af37' : '#ff8787';
                     ctx.lineWidth = 1.5;
                     ctx.stroke();
                 }
