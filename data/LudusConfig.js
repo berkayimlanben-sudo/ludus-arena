@@ -297,4 +297,192 @@
             ]
         }
     ];
+
+    Data.CAREER_REGIONS = [
+        {
+            id: 'capua',
+            order: 1,
+            name: 'Capua Çukurları',
+            minFame: 0,
+            maxTier: 1,
+            icon: '🏜️',
+            desc: 'Kum ve ter kokan yerel çukurlar. Yeni gladyatörlerin ilk sınavı.',
+            rewardMult: 1.0,
+            budgetScale: 1.0
+        },
+        {
+            id: 'provincial',
+            order: 2,
+            name: 'Eyalet Arenası',
+            minFame: 25,
+            maxTier: 2,
+            icon: '🏟️',
+            desc: 'Taş tribünlü eyalet arenaları. Dövüş stilleri ve ilk perkli rakipler başlar.',
+            rewardMult: 1.15,
+            budgetScale: 1.06
+        },
+        {
+            id: 'colosseum',
+            order: 3,
+            name: 'Roma Kolezyumu',
+            minFame: 75,
+            maxTier: 3,
+            icon: '🦅',
+            desc: 'Başkentin dev arenası. Ağır zırhlı, çift perkli ustalar ve yüksek ödüller.',
+            rewardMult: 1.35,
+            budgetScale: 1.12
+        },
+        {
+            id: 'imperial',
+            order: 4,
+            name: 'İmparatorluk Turnuvası',
+            minFame: 150,
+            maxTier: 3,
+            icon: '👑',
+            desc: 'İmparatorun locası önünde 3 maçlık final şampiyonası ve New Game+ prestiji!',
+            rewardMult: 1.5,
+            budgetScale: 1.18
+        }
+    ];
+
+    Data.IMPERIAL_TOURNAMENT = [
+        {
+            round: 1,
+            title: 'Turnuva 1/3 — Praetorian Öncüsü',
+            name: 'Valerius (Praetorian)',
+            traitId: 'disciplined',
+            styleId: 'counter',
+            perks: ['shield_master', 'iron_will'],
+            weaponId: 'sword',
+            shieldId: 'scutum',
+            armorId: 'chain',
+            helmetId: 'corinthian',
+            skinColor: '#e0ac82',
+            baseStats: { strength: 13, agility: 12, vitality: 15 },
+            rewardGold: 220,
+            rewardFame: 20,
+            isBoss: false
+        },
+        {
+            round: 2,
+            title: 'Turnuva 2/3 — Doğu Lejyonu Ustası',
+            name: 'Vespera (Mızrak Fırtınası)',
+            traitId: 'nimble',
+            styleId: 'skirmisher',
+            perks: ['swift_foot', 'blood_scent', 'second_wind'],
+            weaponId: 'trident',
+            shieldId: 'none',
+            armorId: 'chain',
+            helmetId: 'galea',
+            skinColor: '#d2996c',
+            baseStats: { strength: 14, agility: 17, vitality: 14 },
+            rewardGold: 340,
+            rewardFame: 30,
+            isBoss: false
+        },
+        {
+            round: 3,
+            title: 'Turnuva 3/3 — İmparatorluk Finali',
+            name: 'Commodus Primus (İmparatorluk Tacı)',
+            traitId: 'berserker',
+            styleId: 'aggressive',
+            perks: ['heavy_hand', 'executioner', 'iron_will'],
+            weaponId: 'axe',
+            shieldId: 'none',
+            armorId: 'plate',
+            helmetId: 'horned',
+            skinColor: '#c68652',
+            baseStats: { strength: 17, agility: 14, vitality: 19 },
+            rewardGold: 750,
+            rewardFame: 75,
+            isBoss: true
+        }
+    ];
+
+    Data.SENATORS = {
+        crassus: {
+            id: 'crassus',
+            name: 'Senatör Crassus',
+            title: 'Savaş Lordu & Altın Hamisi',
+            icon: '🪙',
+            perkDesc: '30+ İtibar: +%15 Altın • 60+ İtibar: +%25 Arena Altın Ödülü'
+        },
+        tullius: {
+            id: 'tullius',
+            name: 'Senatör Tullius',
+            title: 'Halk Tribünü',
+            icon: '🏛️',
+            perkDesc: '30+ İtibar: +%15 Şöhret • 60+ İtibar: +%25 Arena Şöhret Ödülü'
+        },
+        valeria: {
+            id: 'valeria',
+            name: 'Senatris Valeria',
+            title: 'Entrika & Şike Patronu',
+            icon: '🎭',
+            perkDesc: 'Yüksek itibar şike yakalanma riskini azaltır ve rüşveti büyütür'
+        }
+    };
+
+    Data.SENATE_CONTRACT_TEMPLATES = [
+        {
+            id: 'win_no_shield',
+            senatorId: 'tullius',
+            title: 'Kalkansız Cesaret',
+            desc: 'Kalkan takmadan bir arena maçı kazan.',
+            conditionType: 'no_shield',
+            baseGold: 130,
+            baseFame: 15,
+            repReward: 15
+        },
+        {
+            id: 'win_heavy_weapon',
+            senatorId: 'crassus',
+            title: 'Ağır Çelik Gösterisi',
+            desc: 'Çift El Balta veya Çivili Gürz ile bir arena maçı kazan.',
+            conditionType: 'heavy_weapon',
+            baseGold: 150,
+            baseFame: 14,
+            repReward: 15
+        },
+        {
+            id: 'win_lethal',
+            senatorId: 'crassus',
+            title: 'Kana Susamış Senato',
+            desc: 'Ölümüne (Sine Missione) bir arena maçı kazan.',
+            conditionType: 'lethal',
+            baseGold: 190,
+            baseFame: 22,
+            repReward: 18
+        },
+        {
+            id: 'win_poison',
+            senatorId: 'valeria',
+            title: 'Sessiz Zehir',
+            desc: 'Silah Zehri kuşanarak bir arena maçı kazan.',
+            conditionType: 'with_poison',
+            baseGold: 145,
+            baseFame: 14,
+            repReward: 16
+        },
+        {
+            id: 'win_fast',
+            senatorId: 'valeria',
+            title: 'Yıldırım İnfazı',
+            desc: 'Bir arena maçını 22 saniyeden kısa sürede kazan.',
+            conditionType: 'fast_win',
+            baseGold: 165,
+            baseFame: 18,
+            repReward: 16
+        },
+        {
+            id: 'win_2v2',
+            senatorId: 'tullius',
+            title: 'Kardeşlik Yemini',
+            desc: '2v2 Takım Savaşı kontratı kazan.',
+            conditionType: 'team_2v2',
+            baseGold: 180,
+            baseFame: 20,
+            repReward: 18
+        }
+    ];
 })(window.LudusData = window.LudusData || {});

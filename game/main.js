@@ -21,8 +21,11 @@
     let currentArena = null;
 
     const uiDay = document.getElementById('ui-day');
+    const uiRegion = document.getElementById('ui-region');
+    const uiNgPlus = document.getElementById('ui-ngplus');
     const uiGold = document.getElementById('ui-gold');
     const uiFame = document.getElementById('ui-fame');
+    const uiSenate = document.getElementById('ui-senate');
     const nextDayBtn = document.getElementById('btn-next-day');
     const toastEl = document.getElementById('toast-msg');
     const devPanel = document.getElementById('dev-panel');
@@ -37,6 +40,8 @@
     const arenaFighterSelect2 = document.getElementById('arena-fighter-select-2');
     const arenaConsumable2Wrap = document.getElementById('arena-consumable-2-wrap');
     const arenaConsumableSelect2 = document.getElementById('arena-consumable-select-2');
+    const careerLadderPanel = document.getElementById('career-ladder-panel');
+    const senatePanel = document.getElementById('senate-panel');
     const arenaOpponentsList = document.getElementById('arena-opponents-list');
 
     const doctoreBanner = document.getElementById('doctore-banner');
@@ -44,6 +49,15 @@
     const eventModalTitle = document.getElementById('event-modal-title');
     const eventModalDesc = document.getElementById('event-modal-desc');
     const eventModalChoices = document.getElementById('event-modal-choices');
+
+    const championModal = document.getElementById('champion-modal');
+    const championModalTitle = document.getElementById('champion-modal-title');
+    const championModalDesc = document.getElementById('champion-modal-desc');
+    const btnKeepPlaying = document.getElementById('btn-keep-playing');
+    const btnStartNgPlus = document.getElementById('btn-start-ngplus');
+    let lastChampionGladiatorId = null;
+    let pendingChampionCeremony = null;
+    let pendingReturnTab = 'ludus';
 
     const confirmModal = document.getElementById('confirm-modal');
     const confirmModalKicker = document.getElementById('confirm-modal-kicker');
@@ -159,8 +173,21 @@
     function renderTopStats() {
         const isBoss = ludus.state.day % 5 === 0;
         uiDay.textContent = isBoss ? `👑 Gün ${ludus.state.day} (BOSS!)` : `Gün ${ludus.state.day}`;
+        if (uiRegion) {
+            const reg = ludus.getCurrentRegion();
+            uiRegion.textContent = `${reg.icon} ${reg.name}`;
+        }
+        if (uiNgPlus) {
+            const ng = ludus.state.ngPlusCount || 0;
+            uiNgPlus.classList.toggle('hidden', ng <= 0);
+            if (ng > 0) uiNgPlus.textContent = `🔥 NG+${ng}`;
+        }
         uiGold.textContent = `🪙 ${ludus.state.gold}`;
         uiFame.textContent = `🏛️ ${ludus.state.fame} Şöhret`;
+        if (uiSenate) {
+            const totalRep = ludus.getSenateBonuses().totalReputation || 0;
+            uiSenate.textContent = `⚖️ ${totalRep} Senato`;
+        }
         nextDayBtn.textContent = `🌙 Günü Bitir (-🪙${ludus.getDailyUpkeep()})`;
     }
 
@@ -193,6 +220,15 @@
             const injury = g.injuryId ? Data.INJURIES[g.injuryId] : null;
             const hasPending = Boolean(g.pendingPerkChoices);
             const pendingCount = g.pendingPerkCount || (hasPending ? 1 : 0);
+            const loyaltyVal = g.loyalty !== undefined ? g.loyalty : 65;
+            const lTier = Game.BondingRules ? Game.BondingRules.getLoyaltyTier(loyaltyVal) : { id: 'steady', badge: '🤝 Güvenilir' };
+            const isFavNow = Game.BondingRules && Game.BondingRules.isUsingFavoriteWeapon(g);
+            const extraMeta = [
+                `${isFavNow ? '★ ' : ''}${w.name}`,
+                `${g.wins}G / ${g.losses}M`,
+                `Sadakat ${loyaltyVal}`,
+                g.activeRequest ? '💬 İstek' : ''
+            ].filter(Boolean).join(' · ');
 
             const card = document.createElement('div');
             card.className = `roster-card ${isSel ? 'selected' : ''} ${hasPending ? 'level-ready' : ''}`;
@@ -203,11 +239,12 @@
                 </div>
                 <div class="rc-tags">
                     ${hasPending ? `<span class="perk-alert-badge">🌟 PERK SEÇ!${pendingCount > 1 ? ` (×${pendingCount})` : ''}</span>` : ''}
+                    ${lTier.id === 'rebellious' ? '<span class="rebellious-badge">⚠️ İsyankâr</span>' : (lTier.id === 'loyal' ? '<span class="loyal-badge">❤️ Sadık</span>' : '')}
                     ${trait ? `<span class="trait-badge">${trait.name}</span>` : ''}
                     ${getFatigueBadge(g.fatigue)}
                     ${injury ? `<span class="injury-badge">🩹 ${injury.name}</span>` : ''}
                 </div>
-                <div class="rc-sub">${w.name} • ${g.wins}G / ${g.losses}M</div>
+                <div class="rc-sub">${extraMeta}</div>
                 <div class="bar-wrap hp small">
                     <div class="bar-fill" style="width:${pct}%"></div>
                     <span class="bar-label">${g.currentHp} / ${maxHp}</span>
@@ -291,6 +328,30 @@
                 `;
             };
 
+            const favWeapon = sel.favoriteWeaponId ? Data.WEAPONS[sel.favoriteWeaponId] : null;
+            const isFavEquipped = Boolean(favWeapon && sel.weaponId === favWeapon.id);
+            const loyaltyVal = sel.loyalty !== undefined ? sel.loyalty : 65;
+            const lTier = Game.BondingRules
+                ? Game.BondingRules.getLoyaltyTier(loyaltyVal)
+                : { id: 'steady', name: 'Güvenilir', badge: '🤝 Güvenilir', desc: '' };
+            const dialogueText = Game.BondingRules
+                ? Game.BondingRules.pickGladiatorDialogue(sel, ludus.state, Data.WEAPONS)
+                : '';
+            const talkedToday = sel.lastTalkDay === ludus.state.day;
+            const wineToday = sel.lastWineDay === ludus.state.day;
+            const activeReq = sel.activeRequest;
+
+            const requestHtml = activeReq ? `
+                <div class="request-card">
+                    <div class="request-card-info">
+                        <strong>${activeReq.title}</strong>
+                        <p>${activeReq.desc}</p>
+                        <div class="request-reward-line">Ödül: +${activeReq.rewardLoyalty} Sadakat · +${activeReq.rewardXp} XP</div>
+                    </div>
+                    <button id="btn-decline-request" type="button" class="cancel-confirm-btn">Reddet (-6 Sadakat)</button>
+                </div>
+            ` : '';
+
             detailEl.innerHTML = `
                 <div class="detail-header">
                     <div style="flex:1;">
@@ -306,6 +367,7 @@
                             ${perkPills}
                         </div>
                         <div class="summary-line">Can: ${sel.currentHp}/${sum.maxHp} | Zırh: ${sum.def} | Hız: ${sum.spd} | Ağırlık: ${sum.weight}</div>
+                        ${favWeapon ? `<div class="fav-weapon-line ${isFavEquipped ? 'active' : ''}">★ Favori Silah: ${favWeapon.name} ${isFavEquipped ? '(Takılı: +%6 Hasar, +%5 Kritik)' : '(Takılırsa +%6 Hasar, +%5 Kritik)'}</div>` : ''}
                     </div>
                     <div class="detail-actions">
                         <button id="btn-heal-glad" class="heal-btn" ${healCost === 0 ? 'disabled' : ''}>
@@ -317,6 +379,31 @@
                     </div>
                 </div>
 
+                ${dialogueText ? `<div class="gladiator-dialogue-box">💬 ${dialogueText}</div>` : ''}
+
+                <div class="bonding-panel">
+                    <div class="bonding-head">
+                        <strong>${lTier.badge} · Sadakat ${loyaltyVal}/100</strong>
+                        <span class="bonding-tier-desc">${lTier.desc}</span>
+                    </div>
+                    <div class="loyalty-bar-wrap">
+                        <div class="loyalty-bar-fill ${lTier.id}" style="width:${loyaltyVal}%"></div>
+                        <span class="loyalty-bar-text">${loyaltyVal} / 100</span>
+                    </div>
+                    <div class="bonding-actions-row">
+                        <button id="btn-talk-glad" type="button" class="bond-btn" ${talkedToday ? 'disabled' : ''}>
+                            ${talkedToday ? '✔️ Bugün Sohbet Edildi' : '🗣️ Sohbet Et (+4 Sadakat)'}
+                        </button>
+                        <button id="btn-wine-glad" type="button" class="bond-btn wine" ${wineToday ? 'disabled' : ''}>
+                            ${wineToday ? '🍷 Şarap İkram Edildi' : '🍷 Şarap İkram Et (🪙25)'}
+                        </button>
+                        <button id="btn-quarters-glad" type="button" class="bond-btn ${sel.hasPrivateQuarters ? 'quarters-owned' : 'quarters'}" ${sel.hasPrivateQuarters ? 'disabled' : ''}>
+                            ${sel.hasPrivateQuarters ? '✅ Özel Oda Tahsis Edildi' : '🛏️ Özel Oda (🪙180)'}
+                        </button>
+                    </div>
+                </div>
+
+                ${requestHtml}
                 ${perkChoiceHTML}
 
                 <div class="style-select-box">
@@ -373,6 +460,9 @@
                 sEl.addEventListener('change', () => {
                     const res = ludus.equipItem(sel.id, sEl.dataset.cat, sEl.value);
                     if (!res.ok && res.msg) showToast(res.msg, true);
+                    else if (res.fulfilledRequest) {
+                        showToast(`💬 ${sel.name} isteğini tamamladın! (+${res.fulfilledRequest.rewardLoyalty} Sadakat, +${res.fulfilledRequest.rewardXp} XP)`);
+                    }
                     renderAll();
                 });
             });
@@ -397,7 +487,57 @@
                 healBtn.addEventListener('click', () => {
                     const res = ludus.healGladiator(sel.id);
                     if (!res.ok && res.msg) showToast(res.msg, true);
-                    else ludusScene.triggerAnim(sel.id, 'HEAL');
+                    else {
+                        ludusScene.triggerAnim(sel.id, 'HEAL');
+                        if (res.fulfilledRequest) {
+                            showToast(`💬 ${sel.name} iyileşme isteğini tamamladın! (+${res.fulfilledRequest.rewardLoyalty} Sadakat, +${res.fulfilledRequest.rewardXp} XP)`);
+                        }
+                    }
+                    renderAll();
+                });
+            }
+
+            const talkBtn = document.getElementById('btn-talk-glad');
+            if (talkBtn) {
+                talkBtn.addEventListener('click', () => {
+                    const res = ludus.talkToGladiator(sel.id);
+                    if (!res.ok && res.msg) showToast(res.msg, true);
+                    else if (res.ok) showToast(`🗣️ ${sel.name} ile sohbet edildi (+${res.loyaltyDelta} Sadakat)`);
+                    renderAll();
+                });
+            }
+
+            const wineBtn = document.getElementById('btn-wine-glad');
+            if (wineBtn) {
+                wineBtn.addEventListener('click', () => {
+                    const res = ludus.giftWineToGladiator(sel.id);
+                    if (!res.ok && res.msg) showToast(res.msg, true);
+                    else if (res.ok) {
+                        ludusScene.triggerAnim(sel.id, 'HEAL');
+                        const hpTxt = res.hpHealed > 0 ? `, +${res.hpHealed} Can` : '';
+                        showToast(`🍷 ${sel.name} şarap ikramına sevindi (+${res.loyaltyDelta} Sadakat${hpTxt})`);
+                    }
+                    renderAll();
+                });
+            }
+
+            const quartersBtn = document.getElementById('btn-quarters-glad');
+            if (quartersBtn) {
+                quartersBtn.addEventListener('click', () => {
+                    const res = ludus.assignPrivateQuarters(sel.id);
+                    if (!res.ok && res.msg) showToast(res.msg, true);
+                    else if (res.ok) {
+                        showToast(`🛏️ ${sel.name} özel odaya yerleşti! (+${res.loyaltyDelta} Sadakat, her gece +3 Sadakat & +%10 Can)`);
+                    }
+                    renderAll();
+                });
+            }
+
+            const declineReqBtn = document.getElementById('btn-decline-request');
+            if (declineReqBtn) {
+                declineReqBtn.addEventListener('click', () => {
+                    const res = ludus.declineGladiatorRequest(sel.id);
+                    if (res.ok) showToast(`😒 ${sel.name} isteğinin reddedilmesine bozuldu (-6 Sadakat)`, true);
                     renderAll();
                 });
             }
@@ -525,6 +665,7 @@
 
         ludus.state.marketRecruits.forEach(rec => {
             const w = Data.WEAPONS[rec.weaponId];
+            const favW = rec.favoriteWeaponId ? Data.WEAPONS[rec.favoriteWeaponId] : null;
             const a = Data.ARMORS[rec.armorId];
             const trait = Data.TRAITS[rec.traitId];
             const card = document.createElement('div');
@@ -538,6 +679,7 @@
                 <div class="mc-stats">
                     Güç: <b>${rec.stats.strength}</b> • Çeviklik: <b>${rec.stats.agility}</b> • Canlılık: <b>${rec.stats.vitality}</b>
                 </div>
+                ${favW ? `<div class="mc-fav">★ Favori Silah: ${favW.name} (+%6 Hasar, +%5 Kritik)</div>` : ''}
                 <div class="mc-gear">Ekipman: ${w.name} + ${a.name}</div>
                 <button class="hire-btn" ${rec.hired ? 'disabled' : ''}>
                     ${rec.hired ? '✅ Kadroya Katıldı' : `Satın Al (🪙${rec.price})`}
@@ -570,10 +712,12 @@
                 const injText = g.injuryId ? ` [🩹 ${Data.INJURIES[g.injuryId].name}]` : '';
                 const fatText = g.fatigue >= 2 ? ' [🥵 Bitkin]' : (g.fatigue === 1 ? ' [😓 Yorgun]' : '');
                 const stName = Data.FIGHT_STYLES[g.styleId || 'balanced'].name;
+                const isFav = Game.BondingRules && Game.BondingRules.isUsingFavoriteWeapon(g);
+                const wName = `${isFav ? '★ ' : ''}${Data.WEAPONS[g.weaponId].name}`;
 
                 const opt = document.createElement('option');
                 opt.value = g.id;
-                opt.textContent = `${g.name} (Sv.${g.level} • ${g.currentHp}/${maxHp} Can • ${Data.WEAPONS[g.weaponId].name} • ${stName})${fatText}${injText}`;
+                opt.textContent = `${g.name} (Sv.${g.level} • ${g.currentHp}/${maxHp} Can • ${wName} • ${stName})${fatText}${injText}`;
                 if (prevVal && g.id === prevVal) opt.selected = true;
                 else if (!prevVal && idx === defaultIdx) opt.selected = true;
                 selEl.appendChild(opt);
@@ -645,6 +789,9 @@
         arenaConsumableSelect.onchange = renderConsumableChips;
         renderConsumableChips();
 
+        renderCareerLadder();
+        renderSenatePanel();
+
         arenaOpponentsList.innerHTML = '';
         ludus.state.dailyOpponents.forEach(opp => {
             const w = Data.WEAPONS[opp.weaponId];
@@ -685,6 +832,27 @@
                 partnerHTML = `<div class="partner-line">➕ Ortak: <b>${opp.partner.name}</b> (~${opp.partner.maxHp} Can, ${pw.name}${ps.hasShield ? '+' + ps.name : ''}${pExtra ? ` • ${pExtra}` : ''})</div>`;
             }
 
+            let bribeHTML = '';
+            if (opp.bribeOffer && !opp.completed) {
+                const bo = opp.bribeOffer;
+                const riskPct = Math.round((bo.riskChance || 0.2) * 100);
+                const dealMeta = bo.type === 'throw_match'
+                    ? `Rüşvet: +🪙${bo.bribeGold} (Yenilmen gerekir)`
+                    : `Maliyet: 🪙${bo.upfrontCost} (Rakip -%25 Can / -%20 Güç)`;
+                bribeHTML = `
+                    <div class="bribe-offer-box ${bo.accepted ? 'active' : ''}">
+                        <div class="bribe-head">
+                            <span>${bo.title}</span>
+                            <span class="bribe-risk">Risk: %${riskPct}</span>
+                        </div>
+                        <div class="bribe-desc">${bo.desc} • <strong>${dealMeta}</strong></div>
+                        <button type="button" class="bribe-toggle-btn ${bo.accepted ? 'active' : ''}" data-opp-id="${opp.id}">
+                            ${bo.accepted ? '✅ Şike Aktif (İptal Et)' : '🤫 Şikeyi Kabul Et'}
+                        </button>
+                    </div>
+                `;
+            }
+
             const card = document.createElement('div');
             card.className = cardClass;
             card.innerHTML = `
@@ -705,16 +873,283 @@
                     <div>🛡️ ${a.name}${h.id !== 'none' ? ' + ' + h.name : ''}</div>
                     ${partnerHTML}
                 </div>
+                ${bribeHTML}
                 <div class="oc-reward">Ödül: 🪙${opp.rewardGold} Altın • 🏛️ +${opp.rewardFame} Şöhret</div>
                 <button class="primary-btn fight-start-btn" ${opp.completed ? 'disabled' : ''}>
                     ${opp.completed ? '✔️ Tamamlandı' : (opp.isBoss ? '👑 BOSS İLE KAPIŞ!' : (opp.ruleId === 'team_2v2' ? '⚔️ 2v2 MAÇA ÇIK!' : (opp.lethal ? '💀 ÖLÜMÜNE ÇIK!' : '⚔️ Arenaya Çık!')))}
                 </button>
             `;
+
+            const bribeBtn = card.querySelector('.bribe-toggle-btn');
+            if (bribeBtn) {
+                bribeBtn.addEventListener('click', () => {
+                    if (opp.bribeOffer.accepted) {
+                        ludus.cancelBribeOffer(opp.id);
+                        showToast('Şike anlaşması iptal edildi.');
+                    } else {
+                        const res = ludus.acceptBribeOffer(opp.id);
+                        if (!res.ok) showToast(res.msg || 'Şike kabul edilemedi.', true);
+                        else showToast(`🤫 ${opp.name} maçı için gizli anlaşma yapıldı!`);
+                    }
+                    renderAll();
+                });
+            }
+
             card.querySelector('.fight-start-btn').addEventListener('click', () => {
                 startArenaMatch(opp);
             });
             arenaOpponentsList.appendChild(card);
         });
+    }
+
+    function renderSenatePanel() {
+        if (!senatePanel || !Data.SENATORS || !ludus.state.senate) return;
+        const senate = ludus.state.senate;
+        const reps = senate.reputations || { crassus: 0, tullius: 0, valeria: 0 };
+        const bonuses = ludus.getSenateBonuses();
+        const upkeepNote = bonuses.upkeepDiscount > 0
+            ? `Aktif Senato İndirimi: -%${Math.round(bonuses.upkeepDiscount * 100)} Günlük Masraf`
+            : '45+ Toplam İtibarda -%8, 90+ İtibarda -%15 Günlük Masraf indirimi açılır';
+
+        const senatorsHtml = Object.values(Data.SENATORS).map(sen => {
+            const val = reps[sen.id] || 0;
+            const pct = Math.max(0, Math.min(100, val));
+            return `
+                <div class="senator-card">
+                    <div class="senator-card-top">
+                        <span>${sen.icon} ${sen.name}</span>
+                        <span class="senator-rep-pill">${val} İtibar</span>
+                    </div>
+                    <div class="senator-title">${sen.title}</div>
+                    <div class="senator-perk">${sen.perkDesc}</div>
+                    <div class="senator-rep-bar"><div class="senator-rep-fill" style="width:${pct}%"></div></div>
+                </div>
+            `;
+        }).join('');
+
+        const contract = senate.dailyContract;
+        let contractHtml = '';
+        if (!contract) {
+            contractHtml = `
+                <div class="senate-contract-box">
+                    <div class="contract-info">
+                        <strong>📜 Bugün İçin Bekleyen Senato Kontratı Yok</strong>
+                        <p>Yeni güne geçince yeni bir Senato kontratı teklifi gelecek.</p>
+                    </div>
+                </div>
+            `;
+        } else {
+            const patron = Data.SENATORS[contract.senatorId] || { icon: '🏛️', name: 'Senato' };
+            const stateClass = contract.completed ? 'completed' : (contract.accepted ? 'accepted' : '');
+            const statusLabel = contract.completed
+                ? '✅ Kontrat Tamamlandı'
+                : (contract.accepted ? '⏳ Aktif Görev — Maçta Şartı Sağla' : '📜 Yeni Patron Teklifi');
+            const actionsHtml = contract.completed
+                ? '<span class="safe-badge">✔️ Ödül Alındı</span>'
+                : (contract.accepted
+                    ? '<span class="perk-alert-badge">⏳ Aktif</span>'
+                    : `
+                        <button id="btn-accept-contract" type="button" class="senate-accept-btn">📜 Kontratı Kabul Et</button>
+                        <button id="btn-decline-contract" type="button" class="cancel-confirm-btn">Reddet</button>
+                    `);
+
+            contractHtml = `
+                <div class="senate-contract-box ${stateClass}">
+                    <div class="contract-info">
+                        <strong>${patron.icon} ${patron.name}: ${contract.title} <span class="badge">${statusLabel}</span></strong>
+                        <p>${contract.desc}</p>
+                        <div class="contract-reward">Ödül: +🪙${contract.rewardGold} Altın • +🏛️${contract.rewardFame} Şöhret • +⚖️${contract.repReward} ${patron.name} İtibarı</div>
+                    </div>
+                    <div class="contract-actions">${actionsHtml}</div>
+                </div>
+            `;
+        }
+
+        senatePanel.innerHTML = `
+            <div class="senate-head">
+                <strong>⚖️ Roma Senatosu & Patron Kontratları</strong>
+                <span>${upkeepNote}</span>
+            </div>
+            <div class="senators-grid">${senatorsHtml}</div>
+            ${contractHtml}
+        `;
+
+        const accBtn = document.getElementById('btn-accept-contract');
+        if (accBtn) {
+            accBtn.addEventListener('click', () => {
+                const res = ludus.acceptSenateContract();
+                if (res.ok) showToast(`📜 Senato Kontratı kabul edildi: ${res.contract.title}`);
+                renderAll();
+            });
+        }
+        const decBtn = document.getElementById('btn-decline-contract');
+        if (decBtn) {
+            decBtn.addEventListener('click', () => {
+                ludus.declineSenateContract();
+                showToast('Senato kontratı reddedildi.');
+                renderAll();
+            });
+        }
+    }
+
+    function openChampionModal(fighterId, res) {
+        if (!championModal) return;
+        const g = ludus.state.roster.find(r => r.id === fighterId) || ludus.getSelectedGladiator();
+        lastChampionGladiatorId = g ? g.id : null;
+        const nextNg = (ludus.state.ngPlusCount || 0) + 1;
+        const docText = ludus.state.doctore
+            ? `Mevcut Baş Eğitmenin ${ludus.state.doctore.name} görevine devam eder.`
+            : `${g ? g.name : 'Şampiyonun'} otomatik olarak Baş Eğitmen (Doctore) unvanıyla sonraki nesli yetiştirir.`;
+
+        championModalTitle.textContent = `${g ? g.name : 'Şampiyonun'} İmparatorluk Tacını Kazandı!`;
+        championModalDesc.textContent =
+            `3 maçlık İmparatorluk Turnuvasını fethettin (+${res ? res.goldEarned : 0} Altın, +${res ? res.fameEarned : 0} Şöhret)! ` +
+            `Prestijli New Game+${nextNg} başlatırsan: ${240 + nextNg * 120} başlangıç altını, varis gladyatöre +${nextNg * 2} tüm statlar, +%${nextNg * 30} arena ödülleri kazanırsın ve ${docText}`;
+        championModal.classList.remove('hidden');
+    }
+
+    if (btnKeepPlaying) {
+        btnKeepPlaying.addEventListener('click', () => {
+            championModal.classList.add('hidden');
+            renderAll();
+        });
+    }
+    if (btnStartNgPlus) {
+        btnStartNgPlus.addEventListener('click', () => {
+            championModal.classList.add('hidden');
+            const res = ludus.startNewGamePlus(lastChampionGladiatorId || ludus.state.selectedGladiatorId);
+            if (!res.ok) {
+                showToast(res.msg || 'New Game+ başlatılamadı.', true);
+            } else {
+                showToast(`🔥 Prestijli New Game+${res.ngPlusCount} başladı! Varisin ${res.setup.starterName} arenaya hazır!`);
+                switchTab('ludus');
+            }
+            renderAll();
+        });
+    }
+
+    function renderCareerLadder() {
+        if (!careerLadderPanel || !Data.CAREER_REGIONS) return;
+        const curRegion = ludus.getCurrentRegion();
+        const fame = ludus.state.fame || 0;
+        const ng = ludus.state.ngPlusCount || 0;
+        const tourney = ludus.state.tournament || { active: false, round: 0, fighterId: null, completedChampionship: false };
+
+        if (tourney.active && tourney.fighterId && ludus.state.roster.some(g => g.id === tourney.fighterId)) {
+            arenaFighterSelect.value = tourney.fighterId;
+        }
+
+        const regionsHtml = Data.CAREER_REGIONS.map(r => {
+            const unlocked = fame >= r.minFame;
+            const isActive = curRegion && curRegion.id === r.id;
+            const bonusPct = Math.round((r.rewardMult - 1) * 100);
+            const bonusText = bonusPct > 0 ? ` • +%${bonusPct} Ödül` : '';
+            return `
+                <button type="button"
+                    class="region-card ${isActive ? 'active' : ''} ${unlocked ? '' : 'locked'}"
+                    data-region="${r.id}"
+                    ${unlocked ? '' : 'disabled'}>
+                    <div class="region-card-top">
+                        <span>${r.order}. ${r.icon} ${r.name}</span>
+                        <span>${isActive ? '✅' : (unlocked ? '🔓' : '🔒')}</span>
+                    </div>
+                    <div class="region-card-desc">${r.desc}</div>
+                    <div class="region-card-meta">${unlocked ? `Açık${bonusText}` : `${r.minFame} Şöhret Gerekir`}</div>
+                </button>
+            `;
+        }).join('');
+
+        const imperialUnlocked = fame >= 150;
+        const roundNum = (tourney.round || 0) + 1;
+        const totalRounds = (Data.IMPERIAL_TOURNAMENT && Data.IMPERIAL_TOURNAMENT.length) || 3;
+        const activeFighter = tourney.active && tourney.fighterId
+            ? ludus.state.roster.find(g => g.id === tourney.fighterId)
+            : null;
+
+        let tourneyTitle = '👑 İmparatorluk Turnuvası (3 Maçlık Final)';
+        let tourneySub = imperialUnlocked
+            ? 'Art arda 3 elit rakibi yenerek İmparatorluk Tacını ve Prestijli New Game+ modunu aç! (Yenilgide kalıcı ölüm yok, turnuva sıfırlanır.)'
+            : `İmparatorluk Turnuvası için 150 Şöhret gerekiyor (${fame}/150).`;
+        let tourneyBtnLabel = '👑 Turnuvaya Başla (Tur 1/3)';
+
+        if (imperialUnlocked && tourney.active) {
+            const tpl = Data.IMPERIAL_TOURNAMENT[tourney.round || 0];
+            tourneyTitle = `🔥 Turnuva Devam Ediyor — Maç ${roundNum}/${totalRounds}`;
+            tourneySub = `${activeFighter ? activeFighter.name : 'Savaşçın'} sıradaki rakip ${tpl ? tpl.name : ''} ile karşılaşacak!`;
+            tourneyBtnLabel = `⚔️ Tur ${roundNum}/${totalRounds} Maçına Çık!`;
+        } else if (imperialUnlocked && tourney.completedChampionship) {
+            tourneyTitle = '🏆 İmparatorluk Şampiyonu Unvanı Kazanıldı!';
+            tourneySub = 'Turnuvayı yeniden oynayabilir veya Prestijli New Game+ ile daha güçlü varis + yüksek ödüllerle yeni döngü başlatabilirsin.';
+            tourneyBtnLabel = '👑 Turnuvayı Yeniden Başlat';
+        }
+
+        careerLadderPanel.innerHTML = `
+            <div class="career-head">
+                <strong>🗺️ 4 Bölgeli Kariyer Merdiveni${ng > 0 ? ` (🔥 NG+${ng})` : ''}</strong>
+                <span>Şöhret arttıkça yeni arenalar açılır. Açık bir bölgeye tıklayarak rakipleri ve arena atmosferini seçebilirsin.</span>
+            </div>
+            <div class="career-regions-grid">${regionsHtml}</div>
+            <div class="tournament-banner">
+                <div class="tournament-info">
+                    <strong>${tourneyTitle}</strong>
+                    <span>${tourneySub}</span>
+                </div>
+                <div class="tournament-actions">
+                    <button id="btn-start-tournament" type="button" class="primary-btn" ${imperialUnlocked ? '' : 'disabled'}>
+                        ${imperialUnlocked ? tourneyBtnLabel : `🔒 150 Şöhret (${fame}/150)`}
+                    </button>
+                    ${tourney.completedChampionship ? '<button id="btn-arena-ngplus" type="button" class="doctore-btn">🔥 Prestijli New Game+</button>' : ''}
+                </div>
+            </div>
+        `;
+
+        careerLadderPanel.querySelectorAll('.region-card').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const res = ludus.selectRegion(btn.dataset.region);
+                if (!res.ok && res.msg) {
+                    showToast(res.msg, true);
+                } else if (res.ok && res.region) {
+                    showToast(`${res.region.icon} Bölge seçildi: ${res.region.name}`);
+                    renderAll();
+                }
+            });
+        });
+
+        const startTourneyBtn = document.getElementById('btn-start-tournament');
+        if (startTourneyBtn) {
+            startTourneyBtn.addEventListener('click', () => {
+                const fighterId = (tourney.active && tourney.fighterId) ? tourney.fighterId : arenaFighterSelect.value;
+                const fighter = ludus.state.roster.find(g => g.id === fighterId);
+                if (!fighter) {
+                    showToast('Turnuva savaşçısı kadroda bulunamadı.', true);
+                    return;
+                }
+                if (!tourney.active) {
+                    const maxHp = ludus.getGladiatorMaxHp(fighter);
+                    if (fighter.currentHp < Math.ceil(maxHp * 0.25)) {
+                        showToast(`${fighter.name} çok yaralı! Turnuva öncesi iyileştir.`, true);
+                        return;
+                    }
+                } else if (fighter.currentHp <= 0) {
+                    showToast(`${fighter.name} dövüşemeyecek durumda!`, true);
+                    return;
+                }
+                arenaFighterSelect.value = fighter.id;
+                const tRes = ludus.getNextTournamentOpponent(fighter.id);
+                if (!tRes.ok) {
+                    showToast(tRes.msg || 'Turnuva başlatılamadı.', true);
+                    return;
+                }
+                startArenaMatch(tRes.opp);
+            });
+        }
+
+        const arenaNgBtn = document.getElementById('btn-arena-ngplus');
+        if (arenaNgBtn) {
+            arenaNgBtn.addEventListener('click', () => {
+                openChampionModal(lastChampionGladiatorId || arenaFighterSelect.value, null);
+            });
+        }
     }
 
     function addLog(msg) {
@@ -740,6 +1175,8 @@
             injury: g.injuryId ? Data.INJURIES[g.injuryId] : null,
             stats: Object.assign({}, g.stats),
             weapon: Data.WEAPONS[g.weaponId],
+            favoriteWeaponId: g.favoriteWeaponId || null,
+            loyalty: g.loyalty !== undefined ? g.loyalty : 65,
             shield: Data.SHIELDS[g.shieldId],
             armor: Data.ARMORS[g.armorId],
             helmet: Data.HELMETS[g.helmetId],
@@ -761,9 +1198,10 @@
         const myGlads = selectedIds.map(id => ludus.state.roster.find(g => g.id === id)).filter(Boolean);
         if (myGlads.length !== selectedIds.length) return;
 
+        const isMidTournamentRound = Boolean(opp.isTournament && (opp.tournamentRound || 1) > 1);
         for (const g of myGlads) {
             const maxHp = ludus.getGladiatorMaxHp(g);
-            if (g.currentHp < Math.ceil(maxHp * 0.25)) {
+            if (!isMidTournamentRound && g.currentHp < Math.ceil(maxHp * 0.25)) {
                 showToast(`${g.name} çok yaralı! Önce iyileştir veya başka dövüşçü seç.`, true);
                 return;
             }
@@ -793,29 +1231,79 @@
             battleLogEl.innerHTML = '';
             winnerBanner.classList.add('hidden');
 
-            const leftConfigs = myGlads.map((g, idx) => toGladiatorConfig(g, false, usedConsumables[idx] || null));
+            const bribeActive = Boolean(opp.bribeOffer && opp.bribeOffer.accepted);
+            const isBribeThrow = bribeActive && opp.bribeOffer.type === 'throw_match';
+            const isEnemySabotaged = bribeActive && opp.bribeOffer.type === 'sabotage_enemy';
+
+            const leftConfigs = myGlads.map((g, idx) => Object.assign(
+                toGladiatorConfig(g, false, usedConsumables[idx] || null),
+                { bribeThrow: idx === 0 && isBribeThrow }
+            ));
             const rightConfigs = is2v2
                 ? [toGladiatorConfig(opp, false), toGladiatorConfig(opp.partner, false)]
-                : [toGladiatorConfig(opp, Boolean(opp.isBoss))];
+                : [Object.assign(toGladiatorConfig(opp, Boolean(opp.isBoss)), { sabotaged: isEnemySabotaged })];
 
-            currentArena = new Game.ArenaScene(leftConfigs, rightConfigs);
+            const matchRegionId = opp.isTournament ? 'imperial' : ludus.getCurrentRegion().id;
+            currentArena = new Game.ArenaScene(leftConfigs, rightConfigs, { regionId: matchRegionId });
             currentArena.onBattleLog.connect(addLog);
+
+            pendingReturnTab = 'ludus';
+            pendingChampionCeremony = null;
+            returnLudusBtn.textContent = "🏛️ Ludus'a Dön";
 
             currentArena.onMatchFinished.connect((_, teamSide) => {
                 const didWin = teamSide === 'left';
                 const remHps = currentArena.leftTeam.map(f => f.hp);
-                const res = ludus.recordTeamMatchResult(selectedIds, opp.id, didWin, remHps);
+
+                if (opp.isTournament) {
+                    const res = ludus.recordTournamentMatchResult(selectedIds[0], opp, didWin, remHps[0]);
+                    renderTopStats();
+
+                    if (res.wonChampionship) {
+                        const lvlMsg = res.leveledNames.length > 0 ? ` 🌟 SEVİYE ATLADI: ${res.leveledNames.join(', ')}!` : '';
+                        winnerText.textContent = `👑 İMPARATORLUK ŞAMPİYONU! +${res.goldEarned} Altın, +${res.fameEarned} Şöhret (+${res.xpReward} XP)${lvlMsg}`;
+                        pendingChampionCeremony = { fighterId: selectedIds[0], res };
+                        returnLudusBtn.textContent = '👑 Taç Törenini Gör!';
+                    } else if (didWin && res.nextRound) {
+                        const healNote = res.breatherHeal > 0 ? ` • 💚 +${res.breatherHeal} Soluklanma Canı` : '';
+                        winnerText.textContent = `🏆 TUR ${opp.tournamentRound}/3 KAZANILDI! +${res.goldEarned} Altın (+${res.xpReward} XP)${healNote}`;
+                        pendingReturnTab = 'arena';
+                        returnLudusBtn.textContent = `⚔️ Arena'ya Dön (Tur ${res.nextRound}/3)`;
+                    } else {
+                        const injTxt = res.injuries.length > 0 ? ` • 🩹 ${res.injuries[0]}` : '';
+                        winnerText.textContent = `💀 Turnuvadan Elendin (${opp.tournamentRound}/3)! (+${res.goldEarned} Altın, +${res.xpReward} XP${injTxt})`;
+                    }
+                    winnerBanner.classList.remove('hidden');
+                    return;
+                }
+
+                const res = ludus.recordTeamMatchResult(selectedIds, opp.id, didWin, remHps, {
+                    durationSec: currentArena.matchTime,
+                    consumablesUsed: usedConsumables.map(c => (c ? c.id : null))
+                });
                 renderTopStats();
+
+                const contractNote = res.contractCompleted
+                    ? ` • 📜 SENATO KONTRATI TAMAMLANDI (${res.contractCompleted.title}: +${res.contractCompleted.rewardGold} Altın, +${res.contractCompleted.repReward} İtibar)!`
+                    : '';
+                const bribeNote = res.bribeResult ? ` • ${res.bribeResult.summary}` : '';
+
+                const reqNote = (res.fulfilledRequests && res.fulfilledRequests.length > 0)
+                    ? ` • 💬 İSTEK TAMAMLANDI: ${res.fulfilledRequests.map(r => r.name).join(', ')}!`
+                    : '';
 
                 if (didWin) {
                     const lvlMsg = res.leveledNames.length > 0 ? ` 🌟 SEVİYE ATLADI: ${res.leveledNames.join(', ')}!` : '';
-                    winnerText.textContent = `🏆 ZAFER! +${res.goldEarned} Altın, +${res.fameEarned} Şöhret (+${res.xpReward} XP)${lvlMsg}`;
+                    const promoMsg = res.promotedRegion ? ` • 🗺️ YENİ BÖLGE: ${res.promotedRegion.icon} ${res.promotedRegion.name}!` : '';
+                    winnerText.textContent = `🏆 ZAFER! +${res.goldEarned} Altın, +${res.fameEarned} Şöhret (+${res.xpReward} XP)${lvlMsg}${promoMsg}${contractNote}${bribeNote}${reqNote}`;
                 } else if (res.deadNames.length > 0) {
                     const rookieMsg = res.rescuedByRookie ? ' (Sokaktan yeni bir çaylak katıldı!)' : '';
-                    winnerText.textContent = `⚰️ ${res.deadNames.join(', ')} ARENADA CAN VERDİ!${rookieMsg}`;
+                    winnerText.textContent = `⚰️ ${res.deadNames.join(', ')} ARENADA CAN VERDİ!${rookieMsg}${bribeNote}`;
+                } else if (res.bribeResult && res.bribeResult.keptDeal && res.bribeResult.type === 'throw_match') {
+                    winnerText.textContent = `🎭 ŞİKE MAÇI BİTTİ! ${res.bribeResult.summary} (+${res.xpReward} XP)`;
                 } else {
                     const injTxt = res.injuries.length > 0 ? ` • 🩹 ${res.injuries[0]}` : '';
-                    winnerText.textContent = `💀 YENİLGİ! (+${res.goldEarned} Altın, +${res.xpReward} XP${injTxt})`;
+                    winnerText.textContent = `💀 YENİLGİ! (+${res.goldEarned} Altın, +${res.xpReward} XP${injTxt})${bribeNote}`;
                 }
                 winnerBanner.classList.remove('hidden');
             });
@@ -863,7 +1351,14 @@
     returnLudusBtn.addEventListener('click', () => {
         matchInProgress = false;
         tree.paused = true;
-        switchTab('ludus');
+        const ceremony = pendingChampionCeremony;
+        pendingChampionCeremony = null;
+        returnLudusBtn.textContent = "🏛️ Ludus'a Dön";
+        switchTab(pendingReturnTab || 'ludus');
+        pendingReturnTab = 'ludus';
+        if (ceremony) {
+            openChampionModal(ceremony.fighterId, ceremony.res);
+        }
     });
 
     ludusCanvas.addEventListener('click', (e) => {
@@ -987,8 +1482,10 @@
         renderAll();
     });
     document.getElementById('dev-add-fame').addEventListener('click', () => {
-        ludus.devAddFame(25);
-        showToast('🛠️ Test: +25 Şöhret eklendi!');
+        const promoted = ludus.devAddFame(25);
+        showToast(promoted
+            ? `🗺️ Test: +25 Şöhret eklendi — Yeni Bölge Açıldı: ${promoted.icon} ${promoted.name}!`
+            : '🛠️ Test: +25 Şöhret eklendi!');
         renderAll();
     });
     document.getElementById('dev-add-xp').addEventListener('click', () => {
@@ -1027,6 +1524,54 @@
         ludus.devTriggerEvent();
         renderAll();
     });
+    const devUnlockTourneyBtn = document.getElementById('dev-unlock-tourney');
+    if (devUnlockTourneyBtn) {
+        devUnlockTourneyBtn.addEventListener('click', () => {
+            if (matchInProgress) return;
+            ludus.devUnlockTournament();
+            showToast('👑 Test: İmparatorluk Turnuvası (150 Şöhret) açıldı! Arena sekmesine bak.');
+            renderAll();
+        });
+    }
+    const devNewContractBtn = document.getElementById('dev-new-contract');
+    if (devNewContractBtn) {
+        devNewContractBtn.addEventListener('click', () => {
+            if (matchInProgress) return;
+            const c = ludus.devGenerateSenateContract();
+            showToast(c ? `🏛️ Test: Yeni Senato Kontratı: ${c.title}` : 'Kontrat üretilemedi.', !c);
+            renderAll();
+        });
+    }
+    const devSpawnBribeBtn = document.getElementById('dev-spawn-bribe');
+    if (devSpawnBribeBtn) {
+        devSpawnBribeBtn.addEventListener('click', () => {
+            if (matchInProgress) return;
+            const res = ludus.devSpawnBribeOffer();
+            showToast(res ? `🤫 Test: ${res.opp.name} maçına Şike Teklifi eklendi! Arena sekmesine bak.` : 'Uygun 1v1 rakip yok!', !res);
+            renderAll();
+        });
+    }
+
+    const devLowLoyaltyBtn = document.getElementById('dev-low-loyalty');
+    if (devLowLoyaltyBtn) {
+        devLowLoyaltyBtn.addEventListener('click', () => {
+            const sel = ludus.getSelectedGladiator();
+            if (!sel) return;
+            const nextVal = ludus.devAdjustLoyalty(sel.id, -30);
+            showToast(`😠 Test: ${sel.name} sadakati düşürüldü (${nextVal}/100)!`, true);
+            renderAll();
+        });
+    }
+    const devNewRequestBtn = document.getElementById('dev-new-request');
+    if (devNewRequestBtn) {
+        devNewRequestBtn.addEventListener('click', () => {
+            const sel = ludus.getSelectedGladiator();
+            if (!sel) return;
+            const req = ludus.devGenerateRequest(sel.id);
+            showToast(req ? `💬 Test: ${sel.name} için istek üretildi: ${req.title}` : 'İstek üretilemedi.', !req);
+            renderAll();
+        });
+    }
 
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => switchTab(btn.dataset.tab));
@@ -1039,15 +1584,22 @@
         const injuryNote = (info.healedInjuries && info.healedInjuries.length > 0)
             ? ` • 🩹 Revirde iyileşti: ${info.healedInjuries.join(', ')}`
             : '';
+        const reqNote = (info.fulfilledRequestNames && info.fulfilledRequestNames.length > 0)
+            ? ` • 💬 İstek tamamlandı: ${info.fulfilledRequestNames.join(', ')}`
+            : '';
         const floorNote = info.starvationFloorApplied
             ? ' (Savaşçı %25 dövüş sınırına toparlandı)'
             : '';
-        if (info.starved) {
-            showToast(`⚠️ Erzak parası yetmedi (-🪙${info.upkeep})! Kadro az iyileşti${floorNote}.`, true);
+        const rebellionTriggered = info.rebellionReport && info.rebellionReport.triggered;
+
+        if (rebellionTriggered) {
+            showToast(`⚠️ İSYAN RİSKİ! ${info.rebellionReport.instigators.join(', ')} gece huzursuzluk çıkardı — diğerlerinin morali (-6) düştü!`, true);
+        } else if (info.starved) {
+            showToast(`⚠️ Erzak parası yetmedi (-🪙${info.upkeep})! Kadro az iyileşti ve sadakat düştü${floorNote}.`, true);
         } else if (isBoss) {
-            showToast(`👑 Gün ${ludus.state.day}: ŞAMPİYONA BOSS GÜNÜ! (-🪙${info.upkeep})${injuryNote}`);
+            showToast(`👑 Gün ${ludus.state.day}: ŞAMPİYONA BOSS GÜNÜ! (-🪙${info.upkeep})${injuryNote}${reqNote}`);
         } else {
-            showToast(`Gün ${ludus.state.day} başladı! (-🪙${info.upkeep} masraf)${injuryNote}${floorNote}`);
+            showToast(`Gün ${ludus.state.day} başladı! (-🪙${info.upkeep} masraf)${injuryNote}${reqNote}${floorNote}`);
         }
         renderAll();
     });

@@ -47,6 +47,8 @@
                         styleId: 'balanced',
                         stats: { strength: 11, agility: 10, vitality: 11 },
                         weaponId: 'sword',
+                        favoriteWeaponId: 'sword',
+                        loyalty: 65,
                         shieldId: 'none',
                         armorId: 'tunic',
                         helmetId: 'none'
@@ -54,6 +56,17 @@
                 ],
                 selectedGladiatorId: null,
                 doctore: null,
+                ngPlusCount: 0,
+                currentRegionId: 'capua',
+                tournament: {
+                    active: false,
+                    round: 0,
+                    fighterId: null,
+                    completedChampionship: false
+                },
+                senate: Game.SenateRules
+                    ? Game.SenateRules.createDefaultSenateState()
+                    : { reputations: { crassus: 0, tullius: 0, valeria: 0 }, dailyContract: null, completedContractsCount: 0, bribesCompleted: 0, scandalsCount: 0 },
                 lastEventDay: 1,
                 lastEventId: null,
                 pendingEvent: null,
@@ -61,6 +74,15 @@
                 dailyOpponents: []
             };
             this.state.selectedGladiatorId = this.state.roster[0].id;
+            if (Game.BondingRules && this.state.roster[0]) {
+                const starter = this.state.roster[0];
+                starter.activeRequest = Game.BondingRules.generatePersonalRequest(
+                    starter,
+                    this.state,
+                    Data.WEAPONS,
+                    this.getGladiatorMaxHp(starter)
+                );
+            }
             this.refreshDailyEvents();
             this.saveToLocalStorage();
         }
@@ -76,6 +98,35 @@
                 this.state.inventory.consumables = { poison: 0, net: 0, potion: 0 };
             }
             if (this.state.doctore === undefined) this.state.doctore = null;
+            if (this.state.ngPlusCount === undefined) this.state.ngPlusCount = 0;
+            if (!this.state.currentRegionId) {
+                this.state.currentRegionId = (Game.CareerRules && Data.CAREER_REGIONS)
+                    ? Game.CareerRules.getHighestUnlockedRegion(this.state.fame || 0, Data.CAREER_REGIONS).id
+                    : 'capua';
+            }
+            if (!this.state.tournament) {
+                this.state.tournament = {
+                    active: false,
+                    round: 0,
+                    fighterId: null,
+                    completedChampionship: false
+                };
+            }
+            if (!this.state.senate) {
+                this.state.senate = Game.SenateRules
+                    ? Game.SenateRules.createDefaultSenateState()
+                    : { reputations: { crassus: 0, tullius: 0, valeria: 0 }, dailyContract: null, completedContractsCount: 0, bribesCompleted: 0, scandalsCount: 0 };
+            }
+            if (!this.state.senate.reputations) {
+                this.state.senate.reputations = { crassus: 0, tullius: 0, valeria: 0 };
+            }
+            ['crassus', 'tullius', 'valeria'].forEach(sid => {
+                if (this.state.senate.reputations[sid] === undefined) this.state.senate.reputations[sid] = 0;
+            });
+            if (this.state.senate.dailyContract === undefined) this.state.senate.dailyContract = null;
+            if (this.state.senate.completedContractsCount === undefined) this.state.senate.completedContractsCount = 0;
+            if (this.state.senate.bribesCompleted === undefined) this.state.senate.bribesCompleted = 0;
+            if (this.state.senate.scandalsCount === undefined) this.state.senate.scandalsCount = 0;
             if (this.state.lastEventDay === undefined) this.state.lastEventDay = this.state.day || 1;
             if (this.state.lastEventId === undefined) this.state.lastEventId = null;
             if (this.state.pendingEvent === undefined) this.state.pendingEvent = null;
@@ -93,6 +144,18 @@
                 if (obj.pendingPerkCount === undefined) obj.pendingPerkCount = obj.pendingPerkChoices ? 1 : 0;
                 if (obj.wins === undefined) obj.wins = 0;
                 if (obj.losses === undefined) obj.losses = 0;
+                if (!obj.favoriteWeaponId) {
+                    obj.favoriteWeaponId = Game.BondingRules
+                        ? Game.BondingRules.pickFavoriteWeaponId(obj.origin, obj.traitId, Data.WEAPONS)
+                        : (obj.weaponId || 'sword');
+                }
+                if (obj.loyalty === undefined) obj.loyalty = 65;
+                else if (Game.BondingRules) obj.loyalty = Game.BondingRules.clampLoyalty(obj.loyalty);
+                if (obj.hasPrivateQuarters === undefined) obj.hasPrivateQuarters = false;
+                if (obj.lastTalkDay === undefined) obj.lastTalkDay = 0;
+                if (obj.lastWineDay === undefined) obj.lastWineDay = 0;
+                if (obj.lastBribeThrowDay === undefined) obj.lastBribeThrowDay = 0;
+                if (obj.activeRequest === undefined) obj.activeRequest = null;
             };
             (this.state.roster || []).forEach(ensureGlad);
             (this.state.marketRecruits || []).forEach(ensureGlad);
@@ -101,6 +164,7 @@
                 if (opp.lethal === undefined) opp.lethal = false;
                 if (!opp.ruleId) opp.ruleId = 'standard';
                 if (opp.partner === undefined) opp.partner = null;
+                if (opp.bribeOffer === undefined) opp.bribeOffer = null;
                 if (opp.partner) ensureGlad(opp.partner);
             });
         }
@@ -109,12 +173,17 @@
             const id = 'g_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
             const stats = opts.stats || { strength: 9, agility: 9, vitality: 9 };
             const armorId = opts.armorId || 'tunic';
+            const origin = opts.origin || pickRandom(Data.ORIGINS);
+            const traitId = opts.traitId || pickRandomKey(Data.TRAITS);
+            const favoriteWeaponId = opts.favoriteWeaponId || (Game.BondingRules
+                ? Game.BondingRules.pickFavoriteWeaponId(origin, traitId, Data.WEAPONS)
+                : (opts.weaponId || 'sword'));
             const g = {
                 id,
                 name: opts.name || pickRandom(Data.GLADIATOR_NAMES),
-                origin: opts.origin || pickRandom(Data.ORIGINS),
+                origin,
                 skinColor: opts.skinColor || pickRandom(Data.SKIN_TONES),
-                traitId: opts.traitId || pickRandomKey(Data.TRAITS),
+                traitId,
                 styleId: opts.styleId || 'balanced',
                 level: opts.level || 1,
                 xp: 0,
@@ -126,6 +195,13 @@
                 injuryId: null,
                 stats,
                 weaponId: opts.weaponId || 'dagger',
+                favoriteWeaponId,
+                loyalty: opts.loyalty !== undefined ? (Game.BondingRules ? Game.BondingRules.clampLoyalty(opts.loyalty) : opts.loyalty) : 65,
+                hasPrivateQuarters: Boolean(opts.hasPrivateQuarters),
+                lastTalkDay: 0,
+                lastWineDay: 0,
+                lastBribeThrowDay: 0,
+                activeRequest: opts.activeRequest || null,
                 shieldId: opts.shieldId || 'none',
                 armorId,
                 helmetId: opts.helmetId || 'none',
@@ -174,8 +250,12 @@
             const styleSpd = g.styleId === 'skirmisher' ? 14 : (g.styleId === 'aggressive' ? 8 : 0);
 
             const def = Math.max(0, Math.round(eff.vitality * 0.35) + a.defense + h.defense + traitDef);
-            const spd = Math.max(60, Math.round(128 + eff.agility * 4 - weight * 2.4 + traitSpd + styleSpd));
-            return { maxHp, def, spd, weight, eff };
+            const loyaltyTier = Game.BondingRules
+                ? Game.BondingRules.getLoyaltyTier(g.loyalty)
+                : { id: 'steady', spdMult: 1.0, dmgMult: 1.0, trainingMult: 1.0 };
+            const spd = Math.max(60, Math.round((128 + eff.agility * 4 - weight * 2.4 + traitSpd + styleSpd) * (loyaltyTier.spdMult || 1.0)));
+            const isFavWeapon = Game.BondingRules ? Game.BondingRules.isUsingFavoriteWeapon(g) : false;
+            return { maxHp, def, spd, weight, eff, loyaltyTier, isFavWeapon };
         }
 
         getSelectedGladiator() {
@@ -187,16 +267,59 @@
             return found || null;
         }
 
+        getSenateBonuses() {
+            if (!Game.SenateRules || !this.state.senate) {
+                return { goldBonusMult: 0, fameBonusMult: 0, bribeRiskReduction: 0, bribeGoldMult: 1, upkeepDiscount: 0, totalReputation: 0 };
+            }
+            return Game.SenateRules.getSenateRewardBonuses(this.state.senate);
+        }
+
         getDailyUpkeep() {
             const rosterCost = this.state.roster.length * 12;
             const bTotal = this.state.buildings.trainingYard + this.state.buildings.infirmary + this.state.buildings.blacksmith;
             const buildingCost = Math.max(0, (bTotal - 3) * 6);
-            return rosterCost + buildingCost;
+            const raw = rosterCost + buildingCost;
+            const discount = this.getSenateBonuses().upkeepDiscount || 0;
+            return Math.max(8, Math.round(raw * (1 - discount)));
+        }
+
+        getCurrentRegion() {
+            if (!Game.CareerRules || !Data.CAREER_REGIONS) {
+                return { id: 'capua', order: 1, name: 'Capua Çukurları', minFame: 0, maxTier: 1, icon: '🏜️', rewardMult: 1.0, budgetScale: 1.0 };
+            }
+            return Game.CareerRules.getRegionById(this.state.currentRegionId, Data.CAREER_REGIONS);
+        }
+
+        _syncRegionAfterFameGain() {
+            if (!Game.CareerRules || !Data.CAREER_REGIONS) return null;
+            const cur = this.getCurrentRegion();
+            const highest = Game.CareerRules.getHighestUnlockedRegion(this.state.fame || 0, Data.CAREER_REGIONS);
+            if (highest && cur && highest.order > cur.order) {
+                this.state.currentRegionId = highest.id;
+                return highest;
+            }
+            return null;
+        }
+
+        selectRegion(regionId) {
+            if (!Game.CareerRules || !Data.CAREER_REGIONS) return { ok: false };
+            if (!Game.CareerRules.isRegionUnlocked(regionId, this.state.fame || 0, Data.CAREER_REGIONS)) {
+                const target = Game.CareerRules.getRegionById(regionId, Data.CAREER_REGIONS);
+                return { ok: false, msg: `${target ? target.name : 'Bölge'} için ${target ? target.minFame : 0} Şöhret gerekiyor!` };
+            }
+            this.state.currentRegionId = regionId;
+            if (!this.state.dailyOpponents.some(o => o.completed)) {
+                this._generateDailyOpponents();
+            }
+            this.saveToLocalStorage();
+            return { ok: true, region: this.getCurrentRegion() };
         }
 
         _generateEnemyFighter(tier, budgetScale = 1.0, ruleId = 'standard') {
+            const region = this.getCurrentRegion();
+            const ngScale = Game.CareerRules ? Game.CareerRules.getNgPlusEnemyScale(this.state.ngPlusCount) : 1.0;
             const rawBudget = randInt(tier.statBudget[0], tier.statBudget[1]);
-            const budget = Math.max(24, Math.round(rawBudget * budgetScale));
+            const budget = Math.max(24, Math.round(rawBudget * budgetScale * (region.budgetScale || 1.0) * ngScale));
             const stats = { strength: 7, agility: 7, vitality: 7 };
             let rem = budget - 21;
             const keys = ['strength', 'agility', 'vitality'];
@@ -267,6 +390,9 @@
         }
 
         _create2v2Contract(tier) {
+            const region = this.getCurrentRegion();
+            const rMult = region.rewardMult || 1.0;
+            const ngReward = Game.CareerRules ? Game.CareerRules.getNgPlusRewardScale(this.state.ngPlusCount) : 1.0;
             const f1 = this._generateEnemyFighter(tier, 0.88, 'team_2v2');
             const f2 = this._generateEnemyFighter(tier, 0.85, 'team_2v2');
             const baseGold = randInt(tier.rewardGold[0], tier.rewardGold[1]);
@@ -291,8 +417,8 @@
                 helmetId: f1.helmetId,
                 maxHp: f1.maxHp,
                 partner: f2,
-                rewardGold: Math.round(baseGold * 1.8),
-                rewardFame: Math.round(baseFame * 1.8),
+                rewardGold: Math.round(baseGold * 1.8 * rMult * ngReward),
+                rewardFame: Math.round(baseFame * 1.8 * rMult * ngReward),
                 completed: false
             };
         }
@@ -309,18 +435,25 @@
                     stats[pickRandom(keys)]++;
                     rem--;
                 }
+                const origin = pickRandom(Data.ORIGINS);
+                const traitId = pickRandomKey(Data.TRAITS);
                 const weaponId = Math.random() < 0.35 ? 'sword' : 'dagger';
                 const armorId = Math.random() < 0.3 ? 'leather' : 'tunic';
+                const favoriteWeaponId = Game.BondingRules
+                    ? Game.BondingRules.pickFavoriteWeaponId(origin, traitId, Data.WEAPONS)
+                    : weaponId;
                 const price = 70 + (budget - 26) * 14 + (weaponId === 'sword' ? 35 : 0) + (armorId === 'leather' ? 25 : 0);
 
                 this.state.marketRecruits.push({
                     id: 'rec_' + i + '_' + Date.now(),
                     name: pickRandom(Data.GLADIATOR_NAMES),
-                    origin: pickRandom(Data.ORIGINS),
+                    origin,
                     skinColor: pickRandom(Data.SKIN_TONES),
-                    traitId: pickRandomKey(Data.TRAITS),
+                    traitId,
                     stats,
                     weaponId,
+                    favoriteWeaponId,
+                    loyalty: 65,
                     shieldId: 'none',
                     armorId,
                     helmetId: 'none',
@@ -329,8 +462,19 @@
                 });
             }
 
+            this._generateDailyOpponents();
+        }
+
+        _generateDailyOpponents() {
             this.state.dailyOpponents = [];
-            const unlockedTiers = Data.ARENA_TIERS.filter(t => this.state.fame >= t.minFame);
+            const region = this.getCurrentRegion();
+            const regionMaxTier = region.maxTier || 3;
+            const rMult = region.rewardMult || 1.0;
+            const ngStat = Game.CareerRules ? Game.CareerRules.getNgPlusEnemyScale(this.state.ngPlusCount) : 1.0;
+            const ngReward = Game.CareerRules ? Game.CareerRules.getNgPlusRewardScale(this.state.ngPlusCount) : 1.0;
+
+            const unlockedTiers = Data.ARENA_TIERS.filter(t => this.state.fame >= t.minFame && t.maxTier <= regionMaxTier);
+            const activeTiers = unlockedTiers.length > 0 ? unlockedTiers : [Data.ARENA_TIERS[0]];
             const isBossDay = (this.state.day % 5 === 0);
 
             for (let i = 0; i < 3; i++) {
@@ -338,9 +482,9 @@
                     const tpl = pickRandom(Data.BOSSES);
                     const bossTier = Math.max(0, Math.floor(this.state.day / 5) - 1);
                     const stats = {
-                        strength: tpl.baseStats.strength + bossTier * 2,
-                        agility: tpl.baseStats.agility + bossTier * 2,
-                        vitality: tpl.baseStats.vitality + bossTier * 2
+                        strength: Math.round((tpl.baseStats.strength + bossTier * 2) * ngStat),
+                        agility: Math.round((tpl.baseStats.agility + bossTier * 2) * ngStat),
+                        vitality: Math.round((tpl.baseStats.vitality + bossTier * 2) * ngStat)
                     };
                     const armorObj = Data.ARMORS[tpl.armorId];
                     const bossPerks = Array.isArray(tpl.perks) ? tpl.perks.slice() : [];
@@ -365,14 +509,14 @@
                         helmetId: tpl.helmetId,
                         maxHp,
                         partner: null,
-                        rewardGold: 450 + bossTier * 180,
-                        rewardFame: 45 + bossTier * 15,
+                        rewardGold: Math.round((450 + bossTier * 180) * ngReward),
+                        rewardFame: Math.round((45 + bossTier * 15) * ngReward),
                         completed: false
                     });
                     continue;
                 }
 
-                const tier = unlockedTiers[Math.min(i, unlockedTiers.length - 1)];
+                const tier = activeTiers[Math.min(i, activeTiers.length - 1)];
 
                 // Kadroda 2+ gladyatör varsa 2. slot 2v2 Takım Savaşı olur!
                 if (i === 1 && this.state.roster.length >= 2) {
@@ -387,8 +531,8 @@
 
                 const f = this._generateEnemyFighter(tier, 1.0, ruleId);
                 const isLethal = (i === 2) || (i === 1 && Math.random() < 0.35);
-                let rewardGold = randInt(tier.rewardGold[0], tier.rewardGold[1]);
-                let rewardFame = randInt(tier.rewardFame[0], tier.rewardFame[1]);
+                let rewardGold = Math.round(randInt(tier.rewardGold[0], tier.rewardGold[1]) * rMult * ngReward);
+                let rewardFame = Math.round(randInt(tier.rewardFame[0], tier.rewardFame[1]) * rMult * ngReward);
 
                 if (ruleId !== 'standard') {
                     rewardGold = Math.round(rewardGold * 1.25);
@@ -418,11 +562,97 @@
                     helmetId: f.helmetId,
                     maxHp: f.maxHp,
                     partner: null,
+                    bribeOffer: null,
                     rewardGold,
                     rewardFame,
                     completed: false
                 });
             }
+
+            this._refreshDailyBribeAndContract();
+        }
+
+        _refreshDailyBribeAndContract(forceContract = false) {
+            if (!Game.SenateRules) return;
+            if (!this.state.senate) this.state.senate = Game.SenateRules.createDefaultSenateState();
+
+            const curContract = this.state.senate.dailyContract;
+            const keepActiveContract = !forceContract && curContract && curContract.accepted && !curContract.completed;
+            if (!keepActiveContract && Data.SENATE_CONTRACT_TEMPLATES) {
+                const region = this.getCurrentRegion();
+                const has2v2 = this.state.roster.length >= 2 || this.state.dailyOpponents.some(o => o.ruleId === 'team_2v2');
+                this.state.senate.dailyContract = Game.SenateRules.pickDailyContract(
+                    Data.SENATE_CONTRACT_TEMPLATES,
+                    region ? region.order : 1,
+                    has2v2,
+                    this.state.ngPlusCount || 0,
+                    Math.random(),
+                    curContract ? curContract.id : null
+                );
+            }
+
+            // Günlük 1v1 rakiplerden en fazla 1 tanesine gizli şike teklifi ekle
+            const alreadyHasBribe = this.state.dailyOpponents.some(o => o.bribeOffer && !o.completed);
+            if (!alreadyHasBribe && (this.state.day >= 2 || Math.random() < 0.65)) {
+                const eligible = this.state.dailyOpponents.filter(o => !o.isBoss && !o.isTournament && o.ruleId !== 'team_2v2' && !o.completed);
+                if (eligible.length > 0 && Math.random() < 0.70) {
+                    const targetOpp = pickRandom(eligible);
+                    targetOpp.bribeOffer = Game.SenateRules.createBribeOfferForOpponent(
+                        targetOpp,
+                        this.state.senate,
+                        this.state.ngPlusCount || 0
+                    );
+                }
+            }
+        }
+
+        acceptSenateContract() {
+            const c = this.state.senate && this.state.senate.dailyContract;
+            if (!c) return { ok: false, msg: 'Aktif senato kontratı yok.' };
+            if (c.completed) return { ok: false, msg: 'Bu kontrat zaten tamamlandı.' };
+            c.accepted = true;
+            this.saveToLocalStorage();
+            return { ok: true, contract: c };
+        }
+
+        declineSenateContract() {
+            if (!this.state.senate || !this.state.senate.dailyContract) return { ok: false };
+            const c = this.state.senate.dailyContract;
+            if (c.completed) return { ok: false };
+            this.state.senate.dailyContract = null;
+            this.saveToLocalStorage();
+            return { ok: true };
+        }
+
+        acceptBribeOffer(opponentId) {
+            const opp = this.state.dailyOpponents.find(o => o.id === opponentId);
+            if (!opp || !opp.bribeOffer || opp.completed) {
+                return { ok: false, msg: 'Geçerli şike teklifi bulunamadı.' };
+            }
+            const offer = opp.bribeOffer;
+            if (offer.accepted) return { ok: true, offer };
+
+            if (offer.upfrontCost > 0 && this.state.gold < offer.upfrontCost) {
+                return { ok: false, msg: `Sabotaj için ${offer.upfrontCost} Altın gerekiyor!` };
+            }
+            if (offer.upfrontCost > 0) {
+                this.state.gold -= offer.upfrontCost;
+            }
+            offer.accepted = true;
+            this.saveToLocalStorage();
+            return { ok: true, offer };
+        }
+
+        cancelBribeOffer(opponentId) {
+            const opp = this.state.dailyOpponents.find(o => o.id === opponentId);
+            if (!opp || !opp.bribeOffer || !opp.bribeOffer.accepted) return { ok: false };
+            const offer = opp.bribeOffer;
+            if (offer.upfrontCost > 0) {
+                this.state.gold += offer.upfrontCost;
+            }
+            offer.accepted = false;
+            this.saveToLocalStorage();
+            return { ok: true };
         }
 
         validateFighterForRule(g, ruleId) {
@@ -505,7 +735,22 @@
 
         // --- TEST ARAÇLARI ---
         devAddGold(amount) { this.state.gold += amount; this.saveToLocalStorage(); }
-        devAddFame(amount) { this.state.fame += amount; this.saveToLocalStorage(); }
+        devAddFame(amount) {
+            this.state.fame += amount;
+            const promoted = this._syncRegionAfterFameGain();
+            if (promoted && !this.state.dailyOpponents.some(o => o.completed)) {
+                this._generateDailyOpponents();
+            }
+            this.saveToLocalStorage();
+            return promoted;
+        }
+        devUnlockTournament() {
+            const need = Math.max(0, 150 - this.state.fame);
+            if (need > 0) this.state.fame += need;
+            this.state.currentRegionId = 'imperial';
+            this._generateDailyOpponents();
+            this.saveToLocalStorage();
+        }
 
         devAddXp(gladiatorId, amount) {
             const g = this.state.roster.find(x => x.id === gladiatorId) || this.getSelectedGladiator();
@@ -572,6 +817,61 @@
             return ev;
         }
 
+        devGenerateSenateContract() {
+            if (!Game.SenateRules || !Data.SENATE_CONTRACT_TEMPLATES) return null;
+            this._refreshDailyBribeAndContract(true);
+            this.saveToLocalStorage();
+            return this.state.senate.dailyContract;
+        }
+
+        devSpawnBribeOffer() {
+            if (!Game.SenateRules) return null;
+            const eligible = this.state.dailyOpponents.filter(o => !o.isBoss && !o.isTournament && o.ruleId !== 'team_2v2' && !o.completed);
+            if (eligible.length === 0) return null;
+            const targetOpp = eligible.find(o => !o.lethal) || eligible[0];
+            const prevType = targetOpp.bribeOffer ? targetOpp.bribeOffer.type : null;
+
+            this.state.dailyOpponents.forEach(o => {
+                if (o.bribeOffer && o.bribeOffer.accepted && o.bribeOffer.upfrontCost > 0) {
+                    this.state.gold += o.bribeOffer.upfrontCost;
+                }
+                if (!o.completed) o.bribeOffer = null;
+            });
+
+            const forced = targetOpp.lethal
+                ? 'sabotage_enemy'
+                : (prevType === 'throw_match' ? 'sabotage_enemy' : 'throw_match');
+            targetOpp.bribeOffer = Game.SenateRules.createBribeOfferForOpponent(
+                targetOpp,
+                this.state.senate,
+                this.state.ngPlusCount || 0,
+                forced
+            );
+            this.saveToLocalStorage();
+            return { opp: targetOpp, offer: targetOpp.bribeOffer };
+        }
+
+        devAdjustLoyalty(gladiatorId, delta) {
+            const g = this.state.roster.find(x => x.id === gladiatorId) || this.getSelectedGladiator();
+            if (!g || !Game.BondingRules) return null;
+            g.loyalty = Game.BondingRules.clampLoyalty((g.loyalty ?? 65) + delta);
+            this.saveToLocalStorage();
+            return g.loyalty;
+        }
+
+        devGenerateRequest(gladiatorId) {
+            const g = this.state.roster.find(x => x.id === gladiatorId) || this.getSelectedGladiator();
+            if (!g || !Game.BondingRules) return null;
+            g.activeRequest = Game.BondingRules.generatePersonalRequest(
+                g,
+                this.state,
+                Data.WEAPONS,
+                this.getGladiatorMaxHp(g)
+            );
+            this.saveToLocalStorage();
+            return g.activeRequest;
+        }
+
         getTrainingCost(g, statKey) {
             const cur = g.stats[statKey];
             const lvl = this.state.buildings.trainingYard;
@@ -579,7 +879,10 @@
                 ? Game.Phase7Rules.getDoctoreBonuses(this.state.doctore).trainingDiscount
                 : 0;
             const discount = Math.max(0.45, 1 - (lvl - 1) * 0.10 - docDiscount);
-            return Math.max(12, Math.round((20 + (cur - 7) * 7) * discount));
+            const loyaltyMult = Game.BondingRules
+                ? (Game.BondingRules.getLoyaltyTier(g.loyalty).trainingMult || 1.0)
+                : 1.0;
+            return Math.max(12, Math.round((20 + (cur - 7) * 7) * discount * loyaltyMult));
         }
 
         getStatCap() {
@@ -624,9 +927,22 @@
 
             this.state.gold -= cost;
             g.injuryId = null;
-            g.currentHp = this.getGladiatorMaxHp(g);
+            const maxHp = this.getGladiatorMaxHp(g);
+            g.currentHp = maxHp;
+
+            let fulfilledRequest = null;
+            if (Game.BondingRules) {
+                const reqRes = Game.BondingRules.evaluateRequestProgress(g, 'heal', { maxHp }, Data.WEAPONS);
+                if (reqRes.fulfilled) {
+                    g.activeRequest = null;
+                    g.loyalty = Game.BondingRules.clampLoyalty((g.loyalty ?? 65) + reqRes.rewardLoyalty);
+                    this.grantXp(g, reqRes.rewardXp);
+                    fulfilledRequest = reqRes;
+                }
+            }
+
             this.saveToLocalStorage();
-            return { ok: true };
+            return { ok: true, fulfilledRequest };
         }
 
         buyItem(categoryKey, itemId) {
@@ -715,8 +1031,80 @@
 
             g[prop] = itemId;
             g.currentHp = Math.min(this.getGladiatorMaxHp(g), g.currentHp);
+
+            let fulfilledRequest = null;
+            if (categoryKey === 'weapons' && Game.BondingRules) {
+                const reqRes = Game.BondingRules.evaluateRequestProgress(g, 'equip', {}, Data.WEAPONS);
+                if (reqRes.fulfilled) {
+                    g.activeRequest = null;
+                    g.loyalty = Game.BondingRules.clampLoyalty((g.loyalty ?? 65) + reqRes.rewardLoyalty);
+                    this.grantXp(g, reqRes.rewardXp);
+                    fulfilledRequest = reqRes;
+                }
+            }
+
             this.saveToLocalStorage();
-            return { ok: true };
+            return { ok: true, fulfilledRequest };
+        }
+
+        talkToGladiator(gladiatorId) {
+            const g = this.state.roster.find(x => x.id === gladiatorId);
+            if (!g || !Game.BondingRules) return { ok: false };
+            if (g.lastTalkDay === this.state.day) {
+                return { ok: false, msg: `${g.name} ile bugün zaten sohbet ettin.` };
+            }
+            g.lastTalkDay = this.state.day;
+            g.loyalty = Game.BondingRules.clampLoyalty((g.loyalty ?? 65) + 4);
+            const dialogue = Game.BondingRules.pickGladiatorDialogue(g, this.state, Data.WEAPONS);
+            this.saveToLocalStorage();
+            return { ok: true, loyaltyDelta: 4, dialogue };
+        }
+
+        giftWineToGladiator(gladiatorId) {
+            const g = this.state.roster.find(x => x.id === gladiatorId);
+            if (!g || !Game.BondingRules) return { ok: false };
+            const cost = 25;
+            if (g.lastWineDay === this.state.day) {
+                return { ok: false, msg: `${g.name} bugün zaten şarap ikramını aldı.` };
+            }
+            if (this.state.gold < cost) {
+                return { ok: false, msg: `Şarap ikramı için ${cost} Altın gerekiyor!` };
+            }
+            this.state.gold -= cost;
+            g.lastWineDay = this.state.day;
+            g.loyalty = Game.BondingRules.clampLoyalty((g.loyalty ?? 65) + 8);
+            const maxHp = this.getGladiatorMaxHp(g);
+            const prevHp = g.currentHp;
+            g.currentHp = Math.min(maxHp, g.currentHp + Math.ceil(maxHp * 0.12));
+            const hpHealed = Math.max(0, g.currentHp - prevHp);
+            this.saveToLocalStorage();
+            return { ok: true, cost, loyaltyDelta: 8, hpHealed };
+        }
+
+        assignPrivateQuarters(gladiatorId) {
+            const g = this.state.roster.find(x => x.id === gladiatorId);
+            if (!g || !Game.BondingRules) return { ok: false };
+            if (g.hasPrivateQuarters) {
+                return { ok: false, msg: `${g.name} zaten özel odaya sahip.` };
+            }
+            const cost = 180;
+            if (this.state.gold < cost) {
+                return { ok: false, msg: `Özel oda tahsisi için ${cost} Altın gerekiyor!` };
+            }
+            this.state.gold -= cost;
+            g.hasPrivateQuarters = true;
+            g.loyalty = Game.BondingRules.clampLoyalty((g.loyalty ?? 65) + 15);
+            this.saveToLocalStorage();
+            return { ok: true, cost, loyaltyDelta: 15 };
+        }
+
+        declineGladiatorRequest(gladiatorId) {
+            const g = this.state.roster.find(x => x.id === gladiatorId);
+            if (!g || !g.activeRequest || !Game.BondingRules) return { ok: false };
+            g.activeRequest = null;
+            g.loyalty = Game.BondingRules.clampLoyalty((g.loyalty ?? 65) - 6);
+            this.saveToLocalStorage();
+            return { ok: true, loyaltyDelta: -6 };
         }
 
         hireRecruit(recruitId) {
@@ -745,6 +1133,8 @@
                 traitId: rec.traitId,
                 stats,
                 weaponId: rec.weaponId,
+                favoriteWeaponId: rec.favoriteWeaponId,
+                loyalty: rec.loyalty !== undefined ? rec.loyalty : 65,
                 shieldId: rec.shieldId,
                 armorId: rec.armorId,
                 helmetId: rec.helmetId
@@ -790,6 +1180,7 @@
             const infLvl = this.state.buildings.infirmary || 1;
             const overnightCureChance = (!starved && infLvl >= 2) ? Math.min(0.85, (infLvl - 1) * 0.25) : 0;
             const healedInjuries = [];
+            const fulfilledRequestNames = [];
 
             for (const g of this.state.roster) {
                 g.fatigue = 0;
@@ -798,7 +1189,41 @@
                     healedInjuries.push(g.name);
                 }
                 const maxHp = this.getGladiatorMaxHp(g);
-                g.currentHp = Math.min(maxHp, g.currentHp + Math.ceil(maxHp * healPct));
+                const extraRoomHeal = (!starved && g.hasPrivateQuarters) ? 0.10 : 0;
+                g.currentHp = Math.min(maxHp, g.currentHp + Math.ceil(maxHp * (healPct + extraRoomHeal)));
+
+                if (Game.BondingRules) {
+                    if (starved) {
+                        g.loyalty = Game.BondingRules.clampLoyalty((g.loyalty ?? 65) - 8);
+                    } else if (g.hasPrivateQuarters) {
+                        g.loyalty = Game.BondingRules.clampLoyalty((g.loyalty ?? 65) + 3);
+                    }
+
+                    const reqRes = Game.BondingRules.evaluateRequestProgress(g, 'next_day', { maxHp, starved }, Data.WEAPONS);
+                    if (reqRes.fulfilled) {
+                        g.activeRequest = null;
+                        g.loyalty = Game.BondingRules.clampLoyalty((g.loyalty ?? 65) + reqRes.rewardLoyalty);
+                        this.grantXp(g, reqRes.rewardXp);
+                        fulfilledRequestNames.push(g.name);
+                    }
+                }
+            }
+
+            const rebellionReport = Game.BondingRules
+                ? Game.BondingRules.evaluateOvernightRebellion(this.state.roster)
+                : { triggered: false, instigators: [], affectedNames: [] };
+
+            if (Game.BondingRules) {
+                for (const g of this.state.roster) {
+                    if (!g.activeRequest && Math.random() < 0.75) {
+                        g.activeRequest = Game.BondingRules.generatePersonalRequest(
+                            g,
+                            this.state,
+                            Data.WEAPONS,
+                            this.getGladiatorMaxHp(g)
+                        );
+                    }
+                }
             }
 
             // Açlık + yetersiz altın + tüm kadro <%25 can ölüm spiralini (softlock) önle
@@ -832,7 +1257,15 @@
             }
 
             this.saveToLocalStorage();
-            return { upkeep, starved, eventTriggered, healedInjuries, starvationFloorApplied };
+            return {
+                upkeep,
+                starved,
+                eventTriggered,
+                healedInjuries,
+                starvationFloorApplied,
+                fulfilledRequestNames,
+                rebellionReport
+            };
         }
 
         resolveRomanEvent(choiceId) {
@@ -854,27 +1287,44 @@
             return res;
         }
 
-        recordTeamMatchResult(gladiatorIds, opponentId, didWin, remainingHps) {
+        recordTeamMatchResult(gladiatorIds, opponentId, didWin, remainingHps, matchMeta = {}) {
             const opp = this.state.dailyOpponents.find(o => o.id === opponentId);
             if (opp) opp.completed = true;
+
+            const senateBonuses = this.getSenateBonuses();
+            const bribeAccepted = Boolean(opp && opp.bribeOffer && opp.bribeOffer.accepted);
+            const isIntentionalThrow = bribeAccepted && opp.bribeOffer.type === 'throw_match' && !didWin;
 
             let goldEarned = 0;
             let fameEarned = 0;
             const deadNames = [];
             const leveledNames = [];
             const injuries = [];
+            const fulfilledRequests = [];
             let rescuedByRookie = false;
+
+            const wasInjuredById = {};
+            const fighterSnapshots = gladiatorIds.map((gId, idx) => {
+                const gf = this.state.roster.find(r => r.id === gId);
+                wasInjuredById[gId] = Boolean(gf && gf.injuryId);
+                return {
+                    weaponId: gf ? gf.weaponId : null,
+                    shieldId: gf ? gf.shieldId : 'none',
+                    consumableId: (matchMeta.consumablesUsed && matchMeta.consumablesUsed[idx]) || null
+                };
+            });
 
             if (opp) {
                 if (didWin) {
-                    goldEarned = opp.rewardGold;
+                    goldEarned = Math.round(opp.rewardGold * (1 + (senateBonuses.goldBonusMult || 0)));
                     const hasFav = gladiatorIds.some(id => {
                         const gf = this.state.roster.find(r => r.id === id);
                         return gf && gf.traitId === 'crowd_favorite';
                     });
-                    fameEarned = hasFav ? Math.round(opp.rewardFame * 1.3) : opp.rewardFame;
+                    const rawFame = hasFav ? Math.round(opp.rewardFame * 1.3) : opp.rewardFame;
+                    fameEarned = Math.max(1, Math.round(rawFame * (1 + (senateBonuses.fameBonusMult || 0))));
                 } else {
-                    goldEarned = Math.round(opp.rewardGold * 0.15);
+                    goldEarned = isIntentionalThrow ? 0 : Math.round(opp.rewardGold * 0.15);
                 }
             }
 
@@ -887,6 +1337,7 @@
                 if (gIdx === -1) return;
                 const g = this.state.roster[gIdx];
                 const remHp = remainingHps[idx] !== undefined ? remainingHps[idx] : 0;
+                const foughtInjured = Boolean(wasInjuredById[gId]);
 
                 if (didWin) {
                     g.wins += 1;
@@ -896,19 +1347,41 @@
                         g.injuryId = pickRandomKey(Data.INJURIES);
                         injuries.push(`${g.name}: ${Data.INJURIES[g.injuryId].name}`);
                     }
-                    if (this.grantXp(g, xpReward)) leveledNames.push(g.name);
+                    if (Game.BondingRules) {
+                        const usingFav = Game.BondingRules.isUsingFavoriteWeapon(g);
+                        let loyaltyDelta = usingFav ? 5 : 3;
+                        if (foughtInjured) loyaltyDelta -= 5;
+                        g.loyalty = Game.BondingRules.clampLoyalty((g.loyalty ?? 65) + loyaltyDelta);
+
+                        const reqRes = Game.BondingRules.evaluateRequestProgress(g, 'match_win', { didWin: true }, Data.WEAPONS);
+                        if (reqRes.fulfilled) {
+                            g.activeRequest = null;
+                            g.loyalty = Game.BondingRules.clampLoyalty((g.loyalty ?? 65) + reqRes.rewardLoyalty);
+                            if (this.grantXp(g, reqRes.rewardXp)) leveledNames.push(g.name);
+                            fulfilledRequests.push({ name: g.name, title: reqRes.request.title });
+                        }
+                    }
+                    if (this.grantXp(g, xpReward) && !leveledNames.includes(g.name)) leveledNames.push(g.name);
                 } else if (opp && opp.lethal) {
                     deadNames.push(g.name);
                     this.state.roster.splice(gIdx, 1);
                 } else {
                     g.losses += 1;
                     g.fatigue = (g.fatigue || 0) + 1;
-                    g.currentHp = 1;
-                    if (Math.random() < 0.75) {
+                    g.currentHp = isIntentionalThrow ? Math.max(1, Math.round(this.getGladiatorMaxHp(g) * 0.35)) : 1;
+                    if (!isIntentionalThrow && Math.random() < 0.75) {
                         g.injuryId = pickRandomKey(Data.INJURIES);
                         injuries.push(`${g.name}: ${Data.INJURIES[g.injuryId].name}`);
                     }
-                    if (this.grantXp(g, xpReward)) leveledNames.push(g.name);
+                    if (Game.BondingRules) {
+                        let loyaltyDelta = isIntentionalThrow ? -10 : 0;
+                        if (isIntentionalThrow) g.lastBribeThrowDay = this.state.day;
+                        if (foughtInjured) loyaltyDelta -= 5;
+                        if (loyaltyDelta !== 0) {
+                            g.loyalty = Game.BondingRules.clampLoyalty((g.loyalty ?? 65) + loyaltyDelta);
+                        }
+                    }
+                    if (this.grantXp(g, xpReward) && !leveledNames.includes(g.name)) leveledNames.push(g.name);
                 }
             });
 
@@ -930,10 +1403,246 @@
                 this.state.selectedGladiatorId = this.state.roster[0] ? this.state.roster[0].id : null;
             }
 
-            this.state.gold += goldEarned;
-            this.state.fame += fameEarned;
+            let contractCompleted = null;
+            if (Game.SenateRules && this.state.senate && this.state.senate.dailyContract) {
+                const evalRes = Game.SenateRules.evaluateContractCompletion(this.state.senate.dailyContract, {
+                    didWin,
+                    fighters: fighterSnapshots,
+                    opp,
+                    durationSec: matchMeta.durationSec
+                });
+                if (evalRes.completed) {
+                    this.state.senate.dailyContract.completed = true;
+                    this.state.senate.completedContractsCount = (this.state.senate.completedContractsCount || 0) + 1;
+                    const sid = evalRes.senatorId;
+                    if (sid && this.state.senate.reputations) {
+                        this.state.senate.reputations[sid] = Game.SenateRules.clampReputation(
+                            (this.state.senate.reputations[sid] || 0) + evalRes.repReward
+                        );
+                    }
+                    goldEarned += evalRes.rewardGold;
+                    fameEarned += evalRes.rewardFame;
+                    contractCompleted = evalRes;
+                }
+            }
+
+            let bribeResult = null;
+            if (Game.SenateRules && bribeAccepted) {
+                bribeResult = Game.SenateRules.resolveBribeOutcome(opp.bribeOffer, didWin);
+                if (bribeResult) {
+                    goldEarned += bribeResult.goldDelta;
+                    fameEarned += bribeResult.fameDelta;
+                    if (this.state.senate && this.state.senate.reputations) {
+                        this.state.senate.reputations.valeria = Game.SenateRules.clampReputation(
+                            (this.state.senate.reputations.valeria || 0) + bribeResult.valeriaRepDelta
+                        );
+                        if (bribeResult.caught) {
+                            this.state.senate.scandalsCount = (this.state.senate.scandalsCount || 0) + 1;
+                        } else if (bribeResult.keptDeal) {
+                            this.state.senate.bribesCompleted = (this.state.senate.bribesCompleted || 0) + 1;
+                        }
+                    }
+                }
+            }
+
+            this.state.gold = Math.max(0, this.state.gold + goldEarned);
+            this.state.fame = Math.max(0, this.state.fame + fameEarned);
+            const promotedRegion = this._syncRegionAfterFameGain();
             this.saveToLocalStorage();
-            return { goldEarned, fameEarned, xpReward, deadNames, leveledNames, injuries, rescuedByRookie };
+            return {
+                goldEarned,
+                fameEarned,
+                xpReward,
+                deadNames,
+                leveledNames,
+                injuries,
+                fulfilledRequests,
+                rescuedByRookie,
+                promotedRegion,
+                contractCompleted,
+                bribeResult
+            };
+        }
+
+        // --- İMPARATORLUK TURNUVASI & NEW GAME+ ---
+        getNextTournamentOpponent(fighterId) {
+            if (!Game.CareerRules || !Data.IMPERIAL_TOURNAMENT || !Data.CAREER_REGIONS) {
+                return { ok: false, msg: 'Turnuva kuralları yüklenemedi.' };
+            }
+            if (!Game.CareerRules.isRegionUnlocked('imperial', this.state.fame || 0, Data.CAREER_REGIONS)) {
+                return { ok: false, msg: 'İmparatorluk Turnuvası için 150 Şöhret gerekiyor!' };
+            }
+            if (!this.state.tournament.active) {
+                this.state.tournament = {
+                    active: true,
+                    round: 0,
+                    fighterId,
+                    completedChampionship: Boolean(this.state.tournament && this.state.tournament.completedChampionship)
+                };
+            }
+            const roundIdx = this.state.tournament.round || 0;
+            const opp = Game.CareerRules.buildTournamentOpponent(
+                roundIdx,
+                this.state.ngPlusCount || 0,
+                Data.IMPERIAL_TOURNAMENT,
+                Data.ARMORS
+            );
+            this.saveToLocalStorage();
+            return { ok: true, opp, roundIndex: roundIdx };
+        }
+
+        recordTournamentMatchResult(gladiatorId, opp, didWin, remainingHp) {
+            const g = this.state.roster.find(x => x.id === gladiatorId);
+            const goldEarned = didWin ? opp.rewardGold : Math.round(opp.rewardGold * 0.25);
+            const hasFav = g && g.traitId === 'crowd_favorite';
+            const fameEarned = didWin ? (hasFav ? Math.round(opp.rewardFame * 1.3) : opp.rewardFame) : 5;
+            const xpReward = didWin ? (85 + (opp.tournamentRound || 1) * 35) : 35;
+            const leveledNames = [];
+            const injuries = [];
+
+            if (g) {
+                if (didWin) {
+                    g.wins += 1;
+                    g.currentHp = remainingHp > 0 ? Math.round(remainingHp) : 1;
+                    if (Game.BondingRules) {
+                        const usingFav = Game.BondingRules.isUsingFavoriteWeapon(g);
+                        g.loyalty = Game.BondingRules.clampLoyalty((g.loyalty ?? 65) + (usingFav ? 5 : 3));
+                        const reqRes = Game.BondingRules.evaluateRequestProgress(g, 'match_win', { didWin: true }, Data.WEAPONS);
+                        if (reqRes.fulfilled) {
+                            g.activeRequest = null;
+                            g.loyalty = Game.BondingRules.clampLoyalty((g.loyalty ?? 65) + reqRes.rewardLoyalty);
+                            if (this.grantXp(g, reqRes.rewardXp)) leveledNames.push(g.name);
+                        }
+                    }
+                } else {
+                    g.losses += 1;
+                    g.fatigue = (g.fatigue || 0) + 1;
+                    g.currentHp = 1;
+                    if (Math.random() < 0.75) {
+                        g.injuryId = pickRandomKey(Data.INJURIES);
+                        injuries.push(`${g.name}: ${Data.INJURIES[g.injuryId].name}`);
+                    }
+                }
+                if (this.grantXp(g, xpReward) && !leveledNames.includes(g.name)) leveledNames.push(g.name);
+            }
+
+            const prevTourney = this.state.tournament || { active: true, round: 0, fighterId: gladiatorId, completedChampionship: false };
+            const nextTourney = Game.CareerRules.advanceTournament(prevTourney, didWin, Data.IMPERIAL_TOURNAMENT.length);
+            this.state.tournament = {
+                active: nextTourney.active,
+                round: nextTourney.round,
+                fighterId: nextTourney.fighterId,
+                completedChampionship: nextTourney.completedChampionship
+            };
+
+            let breatherHeal = 0;
+            if (didWin && nextTourney.active && g) {
+                const maxHp = this.getGladiatorMaxHp(g);
+                breatherHeal = Math.ceil(maxHp * 0.15);
+                g.currentHp = Math.min(maxHp, g.currentHp + breatherHeal);
+            }
+
+            let championshipBonusGold = 0;
+            let championshipBonusFame = 0;
+            if (nextTourney.wonChampionship) {
+                const ngReward = Game.CareerRules.getNgPlusRewardScale(this.state.ngPlusCount || 0);
+                championshipBonusGold = Math.round(300 * ngReward);
+                championshipBonusFame = Math.round(40 * ngReward);
+            }
+
+            this.state.gold += goldEarned + championshipBonusGold;
+            this.state.fame += fameEarned + championshipBonusFame;
+            const promotedRegion = this._syncRegionAfterFameGain();
+            this.saveToLocalStorage();
+
+            return {
+                goldEarned: goldEarned + championshipBonusGold,
+                fameEarned: fameEarned + championshipBonusFame,
+                xpReward,
+                leveledNames,
+                injuries,
+                breatherHeal,
+                wonChampionship: nextTourney.wonChampionship,
+                eliminated: nextTourney.eliminated,
+                nextRound: nextTourney.active ? nextTourney.round + 1 : null,
+                promotedRegion
+            };
+        }
+
+        startNewGamePlus(championId) {
+            if (!Game.CareerRules || !this.state.tournament || !this.state.tournament.completedChampionship) {
+                return { ok: false, msg: 'New Game+ için önce İmparatorluk Turnuvasını kazanmalısın!' };
+            }
+            const champ = this.state.roster.find(r => r.id === championId) || this.getSelectedGladiator() || this.state.roster[0];
+            const setup = Game.CareerRules.createNewGamePlusSetup(this.state, champ, Game.Phase7Rules);
+
+            const prevReps = (this.state.senate && this.state.senate.reputations) || {};
+            const carriedReps = {
+                crassus: Math.max(0, Math.round((prevReps.crassus || 0) * 0.5)),
+                tullius: Math.max(0, Math.round((prevReps.tullius || 0) * 0.5)),
+                valeria: Math.max(0, Math.round((prevReps.valeria || 0) * 0.5))
+            };
+
+            this.state = {
+                day: 1,
+                gold: setup.startGold,
+                fame: setup.startFame,
+                buildings: {
+                    trainingYard: 1,
+                    infirmary: 1,
+                    blacksmith: 1
+                },
+                inventory: {
+                    weapons: { dagger: 1 },
+                    shields: { parma: 1 },
+                    armors: { leather: 1 },
+                    helmets: { galea: 1 },
+                    consumables: { poison: 0, net: 0, potion: 0 }
+                },
+                roster: [
+                    this._createGladiator({
+                        name: setup.starterName,
+                        origin: champ ? champ.origin : 'Trakyalı',
+                        traitId: 'disciplined',
+                        styleId: 'balanced',
+                        stats: setup.starterStats,
+                        weaponId: 'sword',
+                        favoriteWeaponId: (champ && champ.favoriteWeaponId) ? champ.favoriteWeaponId : 'sword',
+                        loyalty: 75,
+                        shieldId: 'none',
+                        armorId: 'leather',
+                        helmetId: 'none'
+                    })
+                ],
+                selectedGladiatorId: null,
+                doctore: setup.carriedDoctore,
+                ngPlusCount: setup.nextNgPlus,
+                currentRegionId: 'capua',
+                tournament: {
+                    active: false,
+                    round: 0,
+                    fighterId: null,
+                    completedChampionship: false
+                },
+                senate: {
+                    reputations: carriedReps,
+                    dailyContract: null,
+                    completedContractsCount: (this.state.senate && this.state.senate.completedContractsCount) || 0,
+                    bribesCompleted: (this.state.senate && this.state.senate.bribesCompleted) || 0,
+                    scandalsCount: (this.state.senate && this.state.senate.scandalsCount) || 0
+                },
+                lastEventDay: 1,
+                lastEventId: null,
+                pendingEvent: null,
+                marketRecruits: [],
+                dailyOpponents: []
+            };
+
+            this.state.selectedGladiatorId = this.state.roster[0].id;
+            this._syncRegionAfterFameGain();
+            this.refreshDailyEvents();
+            this.saveToLocalStorage();
+            return { ok: true, ngPlusCount: this.state.ngPlusCount, setup };
         }
 
         saveToLocalStorage() {

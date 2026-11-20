@@ -915,3 +915,550 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .danger-confirm-btn:hover {
     background: #9c2020;
 }
+
+/* FAZ 8.1 KARİYER MERDİVENİ, İMPARATORLUK TURNUVASI & NEW GAME+ */
+.res-pill.region {
+    color: #a5d8ff;
+    border-color: #365270;
+}
+
+.res-pill.ngplus {
+    background: #3a1914;
+    border-color: #d4af37;
+    color: #ffd166;
+}
+
+.career-ladder-panel {
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.career-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.career-head strong {
+    font-size: 14px;
+    color: #e6b85c;
+}
+
+.career-head span {
+    font-size: 11px;
+    color: #b8a58d;
+}
+
+.career-regions-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+@media (max-width: 780px) {
+    .career-regions-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.region-card {
+    background: #14110e;
+    border: 1px solid #382c20;
+    border-radius: 7px;
+    padding: 9px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 5px;
+    text-align: left;
+    transition: border-color 0.12s, background 0.12s;
+}
+
+.region-card.active {
+    border-color: #e6b85c;
+    background: linear-gradient(180deg, #2b2116 0%, #17120d 100%);
+}
+
+.region-card.locked {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.region-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #f3ead8;
+    gap: 4px;
+}
+
+.region-card-desc {
+    font-size: 11px;
+    color: #b8a58d;
+    line-height: 1.35;
+}
+
+.region-card-meta {
+    font-size: 10px;
+    font-weight: 700;
+    color: #ffd166;
+}
+
+.tournament-banner {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(180deg, #2a1816 0%, #17110e 100%);
+    border: 1.5px solid #d4af37;
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+
+.tournament-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.tournament-info strong {
+    font-size: 13px;
+    color: #ffd166;
+}
+
+.tournament-info span {
+    font-size: 12px;
+    color: #e6d8c3;
+}
+
+.tournament-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.champion-modal-card {
+    border-color: #ffd166;
+    box-shadow: 0 0 32px rgba(212, 175, 55, 0.28);
+}
+
+.champion-kicker {
+    color: #ffd166;
+}
+
+.ngplus-cta-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+}
+
+/* FAZ 8.2 SENATO KONTRATLARI & ŞİKE TEKLİFLERİ */
+.res-pill.senate {
+    color: #e599f7;
+    border-color: #6b3f7d;
+}
+
+.senate-panel {
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border-color: #5c3b6e;
+}
+
+.senate-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.senate-head strong {
+    font-size: 14px;
+    color: #e599f7;
+}
+
+.senate-head span {
+    font-size: 11px;
+    color: #c9b8d4;
+}
+
+.senators-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+@media (max-width: 780px) {
+    .senators-grid { grid-template-columns: 1fr; }
+}
+
+.senator-card {
+    background: #141117;
+    border: 1px solid #3f2d4c;
+    border-radius: 7px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.senator-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #f3ead8;
+}
+
+.senator-rep-pill {
+    font-size: 11px;
+    font-weight: 700;
+    color: #e599f7;
+    background: #281b32;
+    border: 1px solid #6b3f7d;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-variant-numeric: tabular-nums;
+}
+
+.senator-title {
+    font-size: 10px;
+    color: #b8a58d;
+}
+
+.senator-perk {
+    font-size: 10px;
+    color: #d6c8b4;
+    line-height: 1.3;
+}
+
+.senator-rep-bar {
+    height: 5px;
+    background: #0d0a10;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 2px;
+}
+
+.senator-rep-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #9c36b5, #e599f7);
+}
+
+.senate-contract-box {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(180deg, #211629 0%, #141017 100%);
+    border: 1.5px solid #862e9c;
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+
+.senate-contract-box.accepted {
+    border-color: #ffd166;
+    background: linear-gradient(180deg, #251d14 0%, #15120e 100%);
+}
+
+.senate-contract-box.completed {
+    border-color: #2b8a3e;
+    background: linear-gradient(180deg, #132217 0%, #0f1711 100%);
+}
+
+.contract-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+    min-width: 240px;
+}
+
+.contract-info strong {
+    font-size: 13px;
+    color: #f3ead8;
+}
+
+.contract-info p {
+    font-size: 12px;
+    color: #d6c8b4;
+    margin: 0;
+}
+
+.contract-reward {
+    font-size: 11px;
+    font-weight: 700;
+    color: #ffd166;
+}
+
+.contract-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.senate-accept-btn {
+    background: #5f2470;
+    border-color: #ae3ec9;
+    color: #f8f0fc;
+    font-weight: 700;
+}
+
+.senate-accept-btn:hover {
+    background: #772e8c;
+}
+
+.bribe-offer-box {
+    margin-top: 6px;
+    padding: 8px 9px;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #241926 0%, #161017 100%);
+    border: 1px dashed #ae3ec9;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.bribe-offer-box.active {
+    border-style: solid;
+    border-color: #ffd166;
+    background: linear-gradient(180deg, #2b2113 0%, #17120c 100%);
+}
+
+.bribe-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #f3d9fa;
+}
+
+.bribe-risk {
+    font-size: 10px;
+    color: #ffa8a8;
+    background: #3b171b;
+    border: 1px solid #a61e4d;
+    padding: 1px 5px;
+    border-radius: 4px;
+}
+
+.bribe-desc {
+    font-size: 11px;
+    color: #cbb8d6;
+    line-height: 1.35;
+}
+
+.bribe-toggle-btn {
+    align-self: flex-start;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    background: #3b1f47;
+    border-color: #9c36b5;
+    color: #f8f0fc;
+}
+
+.bribe-toggle-btn:hover {
+    background: #512b61;
+}
+
+.bribe-toggle-btn.active {
+    background: #423010;
+    border-color: #ffd166;
+    color: #ffd166;
+}
+
+/* GLADYATÖR BAĞ KURMA, FAVORİ SİLAH, SADAKAT & KİŞİSEL İSTEKLER */
+.fav-weapon-line {
+    font-size: 12px;
+    color: #cbb89d;
+    margin-top: 4px;
+}
+.fav-weapon-line.active {
+    color: #ffd166;
+    font-weight: 600;
+}
+
+.rebellious-badge {
+    font-size: 10px;
+    background: #4d1616;
+    border: 1px solid #e03131;
+    color: #ffb3b3;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+}
+
+.loyal-badge {
+    font-size: 10px;
+    background: #1a3a27;
+    border: 1px solid #37b24d;
+    color: #b2f2bb;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+}
+
+.gladiator-dialogue-box {
+    background: #14110e;
+    border: 1px solid #382c20;
+    border-left: 3px solid #d4af37;
+    border-radius: 6px;
+    padding: 9px 12px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    font-style: italic;
+    color: #f3ead8;
+    line-height: 1.45;
+}
+
+.bonding-panel {
+    background: #14110e;
+    border: 1px solid #382c20;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.bonding-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.bonding-head strong {
+    color: #e6b85c;
+    font-size: 13px;
+}
+
+.bonding-tier-desc {
+    font-size: 11px;
+    color: #b8a58d;
+}
+
+.loyalty-bar-wrap {
+    position: relative;
+    height: 15px;
+    background: #0c0a08;
+    border: 1px solid #382c20;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.loyalty-bar-fill {
+    height: 100%;
+    transition: width 0.15s ease;
+}
+.loyalty-bar-fill.loyal { background: linear-gradient(90deg, #2b8a3e, #51cf66); }
+.loyalty-bar-fill.steady { background: linear-gradient(90deg, #2b6cb0, #4dabf7); }
+.loyalty-bar-fill.uneasy { background: linear-gradient(90deg, #b36b00, #fcc419); }
+.loyalty-bar-fill.rebellious { background: linear-gradient(90deg, #9e2a2b, #ff6b6b); }
+
+.loyalty-bar-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 1px 2px #000;
+    font-variant-numeric: tabular-nums;
+}
+
+.bonding-actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.bond-btn {
+    flex: 1;
+    min-width: 145px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 7px 10px;
+    background: #241d16;
+    border-color: #6b5336;
+}
+
+.bond-btn.wine {
+    background: #331922;
+    border-color: #9c3658;
+    color: #ffd6e0;
+}
+
+.bond-btn.quarters {
+    background: #1f2b38;
+    border-color: #4a78ad;
+    color: #d0ebff;
+}
+
+.bond-btn.quarters-owned {
+    background: #172e1f;
+    border-color: #2b8a3e;
+    color: #b2f2bb;
+    opacity: 0.9;
+}
+
+.request-card {
+    background: linear-gradient(180deg, #261e13 0%, #16120d 100%);
+    border: 1.5px solid #d4af37;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.request-card-info {
+    flex: 1;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.request-card-info strong {
+    font-size: 13px;
+    color: #ffd166;
+}
+
+.request-card-info p {
+    font-size: 12px;
+    color: #e6d8c3;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.request-reward-line {
+    font-size: 11px;
+    font-weight: 700;
+    color: #b2f2bb;
+}
+
+.mc-fav {
+    font-size: 12px;
+    color: #ffd166;
+    font-weight: 600;
+}

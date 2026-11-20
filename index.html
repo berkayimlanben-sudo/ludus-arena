@@ -3,19 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ludus Arena — Gladyatör Yönetimi (v0.8)</title>
+    <title>Ludus Arena — Gladyatör Yönetimi (v0.9.6)</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="game-wrapper">
         <header class="top-bar">
-            <div class="brand">⚔️ LUDUS ARENA <span class="badge">v0.8 Eşyalar, Doctore & Olaylar</span></div>
+            <div class="brand">⚔️ LUDUS ARENA <span class="badge">v0.9.6 Bağ & Sadakat</span></div>
 
             <div class="resource-bar">
                 <span id="ui-day" class="res-pill">Gün 1</span>
+                <span id="ui-region" class="res-pill region">🏜️ Capua Çukurları</span>
+                <span id="ui-ngplus" class="res-pill ngplus hidden">🔥 NG+1</span>
                 <span id="ui-gold" class="res-pill gold">🪙 240</span>
                 <span id="ui-fame" class="res-pill fame">🏛️ 0 Şöhret</span>
+                <span id="ui-senate" class="res-pill senate">⚖️ 0 Senato</span>
             </div>
 
             <div class="controls">
@@ -38,6 +41,11 @@
             <button id="dev-heal-all">💚 İyileştir</button>
             <button id="dev-add-wins">🏆 +10 Zafer</button>
             <button id="dev-trigger-event">📜 Olay Kartı</button>
+            <button id="dev-unlock-tourney">👑 Turnuva Aç (150 Şöhret)</button>
+            <button id="dev-new-contract">🏛️ Senato Kontratı</button>
+            <button id="dev-spawn-bribe">🤫 Şike Teklifi</button>
+            <button id="dev-low-loyalty">😠 Sadakat -30</button>
+            <button id="dev-new-request">💬 İstek Üret</button>
         </div>
 
         <nav class="tab-nav">
@@ -103,6 +111,8 @@
                         <select id="arena-consumable-select-2"></select>
                     </label>
                 </div>
+                <div id="career-ladder-panel" class="panel-box career-ladder-panel"></div>
+                <div id="senate-panel" class="panel-box senate-panel"></div>
                 <div id="arena-opponents-list" class="opponents-grid"></div>
             </div>
 
@@ -212,6 +222,18 @@
         </div>
     </div>
 
+    <div id="champion-modal" class="event-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="champion-modal-title">
+        <div class="event-modal-card champion-modal-card">
+            <div class="event-modal-kicker champion-kicker">👑 İMPARATORLUK ŞAMPİYONU</div>
+            <h3 id="champion-modal-title">Kolezyum Tacını Kazandın!</h3>
+            <p id="champion-modal-desc"></p>
+            <div class="confirm-actions">
+                <button id="btn-keep-playing" type="button" class="cancel-confirm-btn">🏛️ Bu Döngüde Devam Et</button>
+                <button id="btn-start-ngplus" type="button" class="doctore-btn ngplus-cta-btn">🔥 Prestijli New Game+ Başlat</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Çekirdek Motor -->
     <script src="engine/Signal.js"></script>
     <script src="engine/Node.js"></script>
@@ -239,6 +261,9 @@
     <script src="game/ArenaScene.js"></script>
     <script src="game/LudusScene.js"></script>
     <script src="game/Phase7Rules.js"></script>
+    <script src="game/CareerRules.js"></script>
+    <script src="game/SenateRules.js"></script>
+    <script src="game/BondingRules.js"></script>
     <script src="game/LudusManager.js"></script>
     <script src="game/main.js"></script>
 </body>

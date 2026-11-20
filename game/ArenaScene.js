@@ -1,9 +1,10 @@
 (function (Game, Engine, Data) {
     class ArenaScene extends Engine.Node2D {
-        constructor(leftConfig, rightConfig) {
+        constructor(leftConfig, rightConfig, options = {}) {
             super('ArenaScene');
             this.leftConfig = leftConfig;
             this.rightConfig = rightConfig;
+            this.regionId = options.regionId || 'capua';
 
             this.camera = new Engine.Camera2D('ArenaCam', 480, 240);
             this.particles = new Game.ParticleSystem();
@@ -98,6 +99,16 @@
             const lNames = this.leftTeam.map(f => f.gladiatorName).join(' & ');
             const rNames = this.rightTeam.map(f => f.gladiatorName).join(' & ');
             this.onBattleLog.emit(`🔔 DÜELLO BAŞLADI: ${lNames} vs ${rNames}!`);
+            this.leftTeam.forEach(f => {
+                if (f.bribeThrow) {
+                    this.onBattleLog.emit(`🎭 ŞİKE AKTİF: ${f.gladiatorName} bahisçiler için bu maçı vermeye hazırlanıyor...`);
+                }
+            });
+            this.rightTeam.forEach(f => {
+                if (f.sabotaged) {
+                    this.onBattleLog.emit(`🧪 SABOTAJ: ${f.gladiatorName} zehirli şaraptan ötürü bitkin (-%25 Can, -%20 Güç/Hız)!`);
+                }
+            });
         }
 
         _checkMatchEnd() {

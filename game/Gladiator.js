@@ -15,6 +15,16 @@
             this.fatigue = config.fatigue || 0;
             this.fightStyle = config.fightStyle || 'balanced';
             this.perks = new Set(config.perks || []);
+            this.sabotaged = Boolean(config.sabotaged);
+            this.bribeThrow = Boolean(config.bribeThrow);
+            this._bribeDiveTriggered = false;
+            this.favoriteWeaponId = config.favoriteWeaponId || null;
+            this.loyalty = config.loyalty !== undefined ? config.loyalty : 65;
+            this.loyaltyTier = Game.BondingRules
+                ? Game.BondingRules.getLoyaltyTier(this.loyalty)
+                : { id: 'steady', dmgMult: 1.0, spdMult: 1.0 };
+            this.loyalHeartUsed = false;
+            this.loyalHeartDefBonus = 0;
 
             const baseStats = Object.assign({ strength: 12, agility: 12, vitality: 12 }, config.stats || {});
 
@@ -23,6 +33,11 @@
                 baseStats.strength = Math.max(4, Math.round(baseStats.strength * fatMult));
                 baseStats.agility = Math.max(4, Math.round(baseStats.agility * fatMult));
                 baseStats.vitality = Math.max(4, Math.round(baseStats.vitality * fatMult));
+            }
+
+            if (this.sabotaged) {
+                baseStats.strength = Math.max(4, Math.round(baseStats.strength * 0.80));
+                baseStats.agility = Math.max(4, Math.round(baseStats.agility * 0.80));
             }
 
             if (this.injury && baseStats[this.injury.stat] !== undefined) {
@@ -56,9 +71,10 @@
 
             const perkHpBonus = this.hasPerk('iron_will') ? 20 : 0;
             this.maxHp = 80 + this.stats.vitality * 6 + (this.armor.hpBonus || 0) + perkHpBonus;
-            this.hp = (config.currentHp !== undefined)
+            const startHp = (config.currentHp !== undefined)
                 ? Math.min(this.maxHp, Math.max(1, config.currentHp))
                 : this.maxHp;
+            this.hp = this.sabotaged ? Math.max(1, Math.round(startHp * 0.75)) : startHp;
 
             this.maxStamina = Math.round(70 + this.stats.vitality * 3 + this.stats.agility * 1.5);
             this.stamina = this.maxStamina;
@@ -66,7 +82,8 @@
             this.strength = this.stats.strength;
             this.agility = this.stats.agility;
             this.defense = Math.max(0, Math.round(this.stats.vitality * 0.35) + (this.armor.defense || 0) + (this.helmet.defense || 0) + this.traitDefMod);
-            this.moveSpeed = Math.max(60, 128 + this.agility * 4 - this.totalWeight * 2.4 + this.traitSpeedMod + this.styleSpeedBonus);
+            const loyaltySpdMult = this.loyaltyTier ? (this.loyaltyTier.spdMult || 1.0) : 1.0;
+            this.moveSpeed = Math.max(60, Math.round((128 + this.agility * 4 - this.totalWeight * 2.4 + this.traitSpeedMod + this.styleSpeedBonus) * loyaltySpdMult));
 
             this.enemies = [];
             this.allies = [];
@@ -143,7 +160,7 @@
         }
 
         getEffectiveDefense() {
-            let d = this.defense - (this.activeEffects.armorBreak > 0 ? 5 : 0);
+            let d = this.defense + (this.loyalHeartDefBonus || 0) - (this.activeEffects.armorBreak > 0 ? 5 : 0);
             if (this.hasPerk('back_to_back') && this.allies.some(a => a && a.hp > 0 && Math.abs(a.x - this.x) <= 165)) {
                 d += 5;
             }
@@ -195,6 +212,8 @@
 
         getStateLabel() {
             let prefix = this.tacticOrder === 'AGGRESSIVE' ? '🔥 ' : (this.tacticOrder === 'DEFENSIVE' ? '🛡️ ' : '');
+            if (this.sabotaged) prefix += '🧪 ';
+            if (this.bribeThrow) prefix += '🎭 ';
             if (this.activeEffects.poison > 0) prefix += '🐍 ';
             if (this.activeEffects.bleed > 0) prefix += '🩸 ';
             if (this.activeEffects.slow > 0) prefix += '🕸️ ';
@@ -477,7 +496,11 @@
                 return;
             }
 
-            const rawCrit = 0.05 + this.agility * 0.007 + (this.weapon.critBonus || 0) + this.traitCritBonus;
+            const isFavWeapon = Boolean(this.favoriteWeaponId && this.weapon && this.weapon.id === this.favoriteWeaponId);
+            const favCritBonus = isFavWeapon ? 0.05 : 0;
+            const favDmgMult = isFavWeapon ? 1.06 : 1.0;
+
+            const rawCrit = 0.05 + this.agility * 0.007 + (this.weapon.critBonus || 0) + this.traitCritBonus + favCritBonus;
             const finalCritChance = rawCrit * (1 - (target.helmet ? target.helmet.critResist : 0));
             const isCrit = this.guaranteedCrit || (Math.random() < finalCritChance);
             this.guaranteedCrit = false;
@@ -487,7 +510,10 @@
             const perkDmgBonus = this.hasPerk('heavy_hand') ? 3 : 0;
 
             let rawDamage = (this.weapon.damage + perkDmgBonus) + this.strength * 0.65 - effectiveDef * 0.45;
-            rawDamage = rawDamage * (0.9 + Math.random() * 0.2);
+            rawDamage = rawDamage * (0.9 + Math.random() * 0.2) * favDmgMult;
+            if (this.loyaltyTier && this.loyaltyTier.dmgMult !== 1.0) {
+                rawDamage *= this.loyaltyTier.dmgMult;
+            }
 
             if (this.trait && this.trait.id === 'berserker' && this.hp <= this.maxHp * 0.35) rawDamage *= 1.30;
             if (this.hasPerk('blood_scent') && target.activeEffects.bleed > 0) rawDamage *= 1.25;
@@ -516,6 +542,7 @@
             }
 
             if (isCrit) rawDamage *= 1.55;
+            if (this.bribeThrow) rawDamage *= 0.55;
 
             const finalDmg = Math.max(3, Math.round(rawDamage));
             target.hp = Math.max(0, target.hp - finalDmg);
@@ -621,6 +648,17 @@
             const state = this.fsm.currentStateName;
 
             if (state !== 'DEAD') {
+                // Şike anlaşması: can %38 altına indiğinde kasıtlı olarak yere düş
+                if (this.bribeThrow && !this._bribeDiveTriggered && this.hp > 0 && this.hp <= this.maxHp * 0.38) {
+                    this._bribeDiveTriggered = true;
+                    if (this.particles) {
+                        this.particles.spawnText(this.x, this.y - 18, '🎭 BİLEREK DÜŞTÜ!', '#ffd166', 15);
+                    }
+                    this.onLog.emit(`🎭 ${this.gladiatorName} şike anlaşması gereği darbenin ardından bilerek yere yığıldı!`);
+                    this._die(this.opponent || this);
+                    return;
+                }
+
                 // İkinci Rüzgar Perki
                 if (this.hasPerk('second_wind') && !this.secondWindUsed && this.hp > 0 && this.hp <= this.maxHp * 0.40) {
                     this.secondWindUsed = true;
@@ -631,6 +669,18 @@
                         this.particles.spawnText(this.x, this.y - 10, '⚡ İKİNCİ RÜZGAR!', '#63e6be', 15);
                     }
                     this.onLog.emit(`⚡ ${this.gladiatorName} İkinci Rüzgarını yakaladı (+15 Can, +40 Stamina)!`);
+                }
+
+                // Sadık Yürek (Sadakat >= 75): Can %25 altına inince maçta 1 kez +10 Stamina ve +5 Zırh
+                if ((this.loyalty || 0) >= 75 && !this.loyalHeartUsed && this.hp > 0 && this.hp <= this.maxHp * 0.25) {
+                    this.loyalHeartUsed = true;
+                    this.loyalHeartDefBonus = 5;
+                    this.stamina = Math.min(this.maxStamina, this.stamina + 10);
+                    if (this.particles) {
+                        this.particles.spawnSparks(this.x, this.y, 1, 14);
+                        this.particles.spawnText(this.x, this.y - 18, '❤️ SADIK YÜREK!', '#ff8787', 15);
+                    }
+                    this.onLog.emit(`❤️ SADIK YÜREK! ${this.gladiatorName} sadakatiyle direndi (+10 Stamina, +5 Zırh)!`);
                 }
 
                 // Can Şurubu Tüketilebilir Eşyası
