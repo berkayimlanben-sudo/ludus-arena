@@ -70,6 +70,7 @@
                 lastEventDay: 1,
                 lastEventId: null,
                 pendingEvent: null,
+                bettingStats: { totalWagered: 0, totalWon: 0, betsWon: 0, betsLost: 0 },
                 marketRecruits: [],
                 dailyOpponents: []
             };
@@ -130,6 +131,9 @@
             if (this.state.lastEventDay === undefined) this.state.lastEventDay = this.state.day || 1;
             if (this.state.lastEventId === undefined) this.state.lastEventId = null;
             if (this.state.pendingEvent === undefined) this.state.pendingEvent = null;
+            if (!this.state.bettingStats) {
+                this.state.bettingStats = { totalWagered: 0, totalWon: 0, betsWon: 0, betsLost: 0 };
+            }
 
             const ensureGlad = (obj) => {
                 if (!obj.traitId) obj.traitId = pickRandomKey(Data.TRAITS);
@@ -156,6 +160,8 @@
                 if (obj.lastWineDay === undefined) obj.lastWineDay = 0;
                 if (obj.lastBribeThrowDay === undefined) obj.lastBribeThrowDay = 0;
                 if (obj.activeRequest === undefined) obj.activeRequest = null;
+                if (!obj.relations || typeof obj.relations !== 'object') obj.relations = {};
+                if (obj.lastSparDay === undefined) obj.lastSparDay = 0;
             };
             (this.state.roster || []).forEach(ensureGlad);
             (this.state.marketRecruits || []).forEach(ensureGlad);
@@ -202,6 +208,8 @@
                 lastWineDay: 0,
                 lastBribeThrowDay: 0,
                 activeRequest: opts.activeRequest || null,
+                relations: opts.relations || {},
+                lastSparDay: 0,
                 shieldId: opts.shieldId || 'none',
                 armorId,
                 helmetId: opts.helmetId || 'none',
@@ -872,6 +880,15 @@
             return g.activeRequest;
         }
 
+        devAdjustRelation(idA, idB, delta = 45) {
+            const g1 = this.state.roster.find(x => x.id === idA);
+            const g2 = this.state.roster.find(x => x.id === idB);
+            if (!g1 || !g2 || !Game.RelationRules) return null;
+            const next = Game.RelationRules.adjustRelation(g1, g2, delta);
+            this.saveToLocalStorage();
+            return next;
+        }
+
         getTrainingCost(g, statKey) {
             const cur = g.stats[statKey];
             const lvl = this.state.buildings.trainingYard;
@@ -1107,6 +1124,93 @@
             return { ok: true, loyaltyDelta: -6 };
         }
 
+        getRelationBetween(idA, idB) {
+            const g1 = this.state.roster.find(x => x.id === idA);
+            const g2 = this.state.roster.find(x => x.id === idB);
+            if (!g1 || !g2 || !Game.RelationRules) return 0;
+            return Game.RelationRules.getRelationScore(g1, g2);
+        }
+
+        get2v2Synergy(idA, idB) {
+            const g1 = this.state.roster.find(x => x.id === idA);
+            const g2 = this.state.roster.find(x => x.id === idB);
+            if (!g1 || !g2 || g1.id === g2.id || !Game.RelationRules) return null;
+            return Game.RelationRules.getCombatPairModifiers(g1, g2);
+        }
+
+        sparTogether(idA, idB) {
+            const g1 = this.state.roster.find(x => x.id === idA);
+            const g2 = this.state.roster.find(x => x.id === idB);
+            if (!g1 || !g2 || g1.id === g2.id || !Game.RelationRules) {
+                return { ok: false, msg: 'Birlikte talim için iki farklı gladyatör seçmelisin.' };
+            }
+            if (g1.lastSparDay === this.state.day) {
+                return { ok: false, msg: `${g1.name} bugün zaten ortak talim yaptı.` };
+            }
+            if (g2.lastSparDay === this.state.day) {
+                return { ok: false, msg: `${g2.name} bugün zaten ortak talim yaptı.` };
+            }
+
+            g1.lastSparDay = this.state.day;
+            g2.lastSparDay = this.state.day;
+
+            const delta = ((g1.loyalty ?? 65) >= 50 && (g2.loyalty ?? 65) >= 50) ? 8 : 6;
+            const nextScore = Game.RelationRules.adjustRelation(g1, g2, delta);
+            const tier = Game.RelationRules.getRelationTier(nextScore);
+
+            const leveledNames = [];
+            if (this.grantXp(g1, 15)) leveledNames.push(g1.name);
+            if (this.grantXp(g2, 15)) leveledNames.push(g2.name);
+
+            this.saveToLocalStorage();
+            return { ok: true, relationDelta: delta, nextScore, tier, xpEach: 15, leveledNames };
+        }
+
+        getMatchOdds(gladiatorIds, opp) {
+            if (!Game.BettingRules || !opp) return null;
+            const myTeam = (gladiatorIds || []).map(id => this.state.roster.find(g => g.id === id)).filter(Boolean);
+            if (myTeam.length === 0) return null;
+            return Game.BettingRules.calculateMatchOdds(myTeam, opp, {
+                weapons: Data.WEAPONS,
+                shields: Data.SHIELDS,
+                armors: Data.ARMORS,
+                helmets: Data.HELMETS
+            });
+        }
+
+        placeMatchBet(gladiatorIds, opp, betSpec) {
+            if (!Game.BettingRules) return { ok: true, active: false, type: 'none', stake: 0, odds: 1 };
+            const odds = this.getMatchOdds(gladiatorIds, opp);
+            const check = Game.BettingRules.validateBet(betSpec, this.state.gold, opp, odds);
+            if (!check.ok) return check;
+            if (check.active) {
+                this.state.gold -= check.stake;
+                if (!this.state.bettingStats) {
+                    this.state.bettingStats = { totalWagered: 0, totalWon: 0, betsWon: 0, betsLost: 0 };
+                }
+                this.state.bettingStats.totalWagered += check.stake;
+                this.saveToLocalStorage();
+            }
+            return check;
+        }
+
+        _resolveAndApplyBet(activeBet, didWin, durationSec = 0) {
+            if (!Game.BettingRules || !activeBet || !activeBet.active) return null;
+            const res = Game.BettingRules.resolveBet(activeBet, didWin, durationSec);
+            if (!res.placed) return null;
+            if (!this.state.bettingStats) {
+                this.state.bettingStats = { totalWagered: 0, totalWon: 0, betsWon: 0, betsLost: 0 };
+            }
+            if (res.won) {
+                this.state.gold += res.payout;
+                this.state.bettingStats.totalWon += res.payout;
+                this.state.bettingStats.betsWon += 1;
+            } else {
+                this.state.bettingStats.betsLost += 1;
+            }
+            return res;
+        }
+
         hireRecruit(recruitId) {
             if (this.state.roster.length >= 6) return { ok: false, msg: 'Ludus kadrosu dolu! (Maksimum 6)' };
             const rec = this.state.marketRecruits.find(r => r.id === recruitId && !r.hired);
@@ -1213,6 +1317,20 @@
                 ? Game.BondingRules.evaluateOvernightRebellion(this.state.roster)
                 : { triggered: false, instigators: [], affectedNames: [] };
 
+            const relationEvents = Game.RelationRules
+                ? Game.RelationRules.evaluateOvernightRelations(this.state.roster)
+                : { triggered: false, events: [] };
+            if (relationEvents.triggered) {
+                relationEvents.events.forEach(ev => {
+                    if (ev.xpEach > 0 && Array.isArray(ev.names)) {
+                        ev.names.forEach(n => {
+                            const member = this.state.roster.find(r => r.name === n);
+                            if (member) this.grantXp(member, ev.xpEach);
+                        });
+                    }
+                });
+            }
+
             if (Game.BondingRules) {
                 for (const g of this.state.roster) {
                     if (!g.activeRequest && Math.random() < 0.75) {
@@ -1264,7 +1382,8 @@
                 healedInjuries,
                 starvationFloorApplied,
                 fulfilledRequestNames,
-                rebellionReport
+                rebellionReport,
+                relationEvents
             };
         }
 
@@ -1445,6 +1564,17 @@
                 }
             }
 
+            let relationUpdate = null;
+            if (Game.RelationRules && gladiatorIds.length >= 2) {
+                const g1 = this.state.roster.find(r => r.id === gladiatorIds[0]);
+                const g2 = this.state.roster.find(r => r.id === gladiatorIds[1]);
+                if (g1 && g2) {
+                    relationUpdate = Game.RelationRules.applyMatchRelationUpdate(g1, g2, didWin);
+                }
+            }
+
+            const betResult = this._resolveAndApplyBet(matchMeta.activeBet, didWin, matchMeta.durationSec || 0);
+
             this.state.gold = Math.max(0, this.state.gold + goldEarned);
             this.state.fame = Math.max(0, this.state.fame + fameEarned);
             const promotedRegion = this._syncRegionAfterFameGain();
@@ -1460,7 +1590,9 @@
                 rescuedByRookie,
                 promotedRegion,
                 contractCompleted,
-                bribeResult
+                bribeResult,
+                relationUpdate,
+                betResult
             };
         }
 
@@ -1491,7 +1623,7 @@
             return { ok: true, opp, roundIndex: roundIdx };
         }
 
-        recordTournamentMatchResult(gladiatorId, opp, didWin, remainingHp) {
+        recordTournamentMatchResult(gladiatorId, opp, didWin, remainingHp, matchMeta = {}) {
             const g = this.state.roster.find(x => x.id === gladiatorId);
             const goldEarned = didWin ? opp.rewardGold : Math.round(opp.rewardGold * 0.25);
             const hasFav = g && g.traitId === 'crowd_favorite';
@@ -1550,6 +1682,8 @@
                 championshipBonusFame = Math.round(40 * ngReward);
             }
 
+            const betResult = this._resolveAndApplyBet(matchMeta.activeBet, didWin, matchMeta.durationSec || 0);
+
             this.state.gold += goldEarned + championshipBonusGold;
             this.state.fame += fameEarned + championshipBonusFame;
             const promotedRegion = this._syncRegionAfterFameGain();
@@ -1565,7 +1699,8 @@
                 wonChampionship: nextTourney.wonChampionship,
                 eliminated: nextTourney.eliminated,
                 nextRound: nextTourney.active ? nextTourney.round + 1 : null,
-                promotedRegion
+                promotedRegion,
+                betResult
             };
         }
 
@@ -1634,6 +1769,7 @@
                 lastEventDay: 1,
                 lastEventId: null,
                 pendingEvent: null,
+                bettingStats: this.state.bettingStats || { totalWagered: 0, totalWon: 0, betsWon: 0, betsLost: 0 },
                 marketRecruits: [],
                 dailyOpponents: []
             };

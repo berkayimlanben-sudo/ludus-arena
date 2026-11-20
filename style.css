@@ -1462,3 +1462,193 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
     color: #ffd166;
     font-weight: 600;
 }
+
+/* YOLDAŞLIK, REKABET (2v2 SİNERJİ) & ARENA BAHİS MASASI */
+.relations-panel {
+    background: #14110e;
+    border: 1px solid #382c20;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.relations-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.relations-head strong {
+    font-size: 13px;
+    color: #e6b85c;
+}
+
+.relations-sub {
+    font-size: 11px;
+    color: #b8a58d;
+}
+
+.relations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.relation-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 9px;
+    background: #1b1611;
+    border: 1px solid #2f251b;
+    border-radius: 6px;
+}
+
+.relation-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
+}
+
+.relation-title-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #f3ead8;
+    font-variant-numeric: tabular-nums;
+}
+
+.relation-score {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.relation-score.brother { color: #69db7c; }
+.relation-score.friendly { color: #a5d8ff; }
+.relation-score.neutral { color: #cbb89d; }
+.relation-score.rival { color: #ff8787; }
+
+.relation-effect-line {
+    font-size: 11px;
+    color: #b8a58d;
+}
+
+.spar-btn {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 10px;
+    background: #232a35;
+    border-color: #4a78ad;
+    color: #d0ebff;
+}
+
+.synergy-preview-bar {
+    margin-top: 8px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    background: #14110e;
+    border: 1px solid #4a3a28;
+    font-size: 12px;
+    color: #e6d8c3;
+    font-variant-numeric: tabular-nums;
+}
+.synergy-preview-bar.brother { border-color: #3a8c58; color: #b7f0c9; }
+.synergy-preview-bar.friendly { border-color: #4a78ad; color: #d0ebff; }
+.synergy-preview-bar.rival { border-color: #c83e37; color: #ffb3b3; }
+
+.arena-betting-panel {
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border-color: #5c4628;
+}
+
+.betting-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.betting-head strong {
+    font-size: 14px;
+    color: #ffd166;
+}
+
+.betting-stats-line {
+    font-size: 11px;
+    color: #cbb89d;
+    font-variant-numeric: tabular-nums;
+}
+
+.bet-controls-grid {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.bet-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.bet-group-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #b8a58d;
+    margin-right: 4px;
+}
+
+.bet-chip-btn {
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #14110e;
+    border: 1px solid #4a3a28;
+    color: #d6c8b4;
+    font-variant-numeric: tabular-nums;
+}
+
+.bet-chip-btn.active {
+    background: #423010;
+    border-color: #ffd166;
+    color: #ffd166;
+}
+
+.betting-note {
+    font-size: 11px;
+    color: #b8a58d;
+    font-variant-numeric: tabular-nums;
+}
+
+.oc-odds-line {
+    font-size: 11px;
+    color: #a5d8ff;
+    padding-top: 4px;
+    border-top: 1px dashed #382c20;
+    font-variant-numeric: tabular-nums;
+}
+
+.oc-bet-preview {
+    font-size: 11px;
+    font-weight: 700;
+    color: #ffd166;
+    font-variant-numeric: tabular-nums;
+}
+
+.oc-bet-preview.blocked {
+    color: #ff8787;
+}

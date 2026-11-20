@@ -25,6 +25,7 @@
                 : { id: 'steady', dmgMult: 1.0, spdMult: 1.0 };
             this.loyalHeartUsed = false;
             this.loyalHeartDefBonus = 0;
+            this.allySynergy = config.allySynergy || null;
 
             const baseStats = Object.assign({ strength: 12, agility: 12, vitality: 12 }, config.stats || {});
 
@@ -81,7 +82,8 @@
 
             this.strength = this.stats.strength;
             this.agility = this.stats.agility;
-            this.defense = Math.max(0, Math.round(this.stats.vitality * 0.35) + (this.armor.defense || 0) + (this.helmet.defense || 0) + this.traitDefMod);
+            const synDefDelta = this.allySynergy ? (this.allySynergy.defDelta || 0) : 0;
+            this.defense = Math.max(0, Math.round(this.stats.vitality * 0.35) + (this.armor.defense || 0) + (this.helmet.defense || 0) + this.traitDefMod + synDefDelta);
             const loyaltySpdMult = this.loyaltyTier ? (this.loyaltyTier.spdMult || 1.0) : 1.0;
             this.moveSpeed = Math.max(60, Math.round((128 + this.agility * 4 - this.totalWeight * 2.4 + this.traitSpeedMod + this.styleSpeedBonus) * loyaltySpdMult));
 
@@ -499,8 +501,10 @@
             const isFavWeapon = Boolean(this.favoriteWeaponId && this.weapon && this.weapon.id === this.favoriteWeaponId);
             const favCritBonus = isFavWeapon ? 0.05 : 0;
             const favDmgMult = isFavWeapon ? 1.06 : 1.0;
+            const synCritBonus = this.allySynergy ? (this.allySynergy.critBonus || 0) : 0;
+            const synDmgMult = this.allySynergy ? (this.allySynergy.dmgMult || 1.0) : 1.0;
 
-            const rawCrit = 0.05 + this.agility * 0.007 + (this.weapon.critBonus || 0) + this.traitCritBonus + favCritBonus;
+            const rawCrit = 0.05 + this.agility * 0.007 + (this.weapon.critBonus || 0) + this.traitCritBonus + favCritBonus + synCritBonus;
             const finalCritChance = rawCrit * (1 - (target.helmet ? target.helmet.critResist : 0));
             const isCrit = this.guaranteedCrit || (Math.random() < finalCritChance);
             this.guaranteedCrit = false;
@@ -510,7 +514,7 @@
             const perkDmgBonus = this.hasPerk('heavy_hand') ? 3 : 0;
 
             let rawDamage = (this.weapon.damage + perkDmgBonus) + this.strength * 0.65 - effectiveDef * 0.45;
-            rawDamage = rawDamage * (0.9 + Math.random() * 0.2) * favDmgMult;
+            rawDamage = rawDamage * (0.9 + Math.random() * 0.2) * favDmgMult * synDmgMult;
             if (this.loyaltyTier && this.loyaltyTier.dmgMult !== 1.0) {
                 rawDamage *= this.loyaltyTier.dmgMult;
             }

@@ -1,7 +1,8 @@
 # ⚔️ LUDUS ARENA — Proje Özeti ve AI Devir Teslim (Handoff) Dokümanı
 
 **Repo:** `https://github.com/berkayimlanben-sudo/ludus-arena`  
-**Mevcut Sürüm:** `v0.9.6` (Gladyatör Bağ Kurma, Favori Silahlar, Sadakat & Kişisel İstekler tamamlandı)  
+**Mevcut Sürüm:** `v0.9.7` (2v2 Yoldaşlık & Rekabet Sinerjisi + Arena Bahis Sistemi tamamlandı)  
+**AI & Mimari Rehberleri:** Teknik kurallar için `AGENTS.md`, motor/döngü mimarisi için `ARCHITECTURE.md` dosyalarına bak.  
 **Hedef:** Sıfır kurulumlu, tarayıcıda (`file://`, Express statik sunucu ve GitHub Pages) çalışan **2D Side-View Auto-Battler + Ludus Management (Gladyatör Menajerlik)** web oyunu (*Domina* ve *Swords & Sandals* esintili).
 
 ---
@@ -15,7 +16,7 @@
 
 ## 2. Teknik Mimari ve Dosya Yapısı
 * **Önemli Kural:** Proje **build aracı ve ES Module (`import/export`) KULLANMAZ**. Global namespace (`window.LudusEngine`, `window.LudusData`, `window.LudusGame`) ve IIFE modül yapısı kullanılır. Dosya adları büyük/küçük harfe duyarlıdır (Linux/GitHub Pages uyumu).
-* **Mantık / Görünüm Ayrımı:** Savaş/yapay zeka mantığı (`Gladiator.js`, `ArenaScene.js`, `LudusScene.js`) çizim kodlarından (`game/renderers/`) tamamen ayrıdır; saf oyun kuralları `CombatRules.js`, `Phase7Rules.js`, `CareerRules.js`, `SenateRules.js` ve `BondingRules.js` içinde test edilebilir şekilde ayrıştırılmıştır.
+* **Mantık / Görünüm Ayrımı:** Savaş/yapay zeka mantığı (`Gladiator.js`, `ArenaScene.js`, `LudusScene.js`) çizim kodlarından (`game/renderers/`) tamamen ayrıdır; saf oyun kuralları `CombatRules.js`, `Phase7Rules.js`, `CareerRules.js`, `SenateRules.js`, `BondingRules.js` ve `RelationAndBetRules.js` içinde test edilebilir şekilde ayrıştırılmıştır.
 
 ### Klasör Ağacı
 * `index.html` & `style.css`: Sekmeli yönetim arayüzü (`Ludus`, `Demirci`, `Pazar`, `Arena`) + Test paneli (`#dev-panel`) + 1v1/2v2 HUD + Roma Olay Kartı (`#roman-event-modal`) + oyun içi Onay Penceresi (`#confirm-modal`) + İmparatorluk Şampiyonu / NG+ penceresi (`#champion-modal`).
@@ -37,13 +38,14 @@
   * `CareerRules.js`: Saf 4 bölgeli kariyer merdiveni, 3 maçlık İmparatorluk Turnuvası ve New Game+ taşıma kuralları.
   * `SenateRules.js`: Saf Senatör itibarları (`crassus`, `tullius`, `valeria`), günlük Senato kontratları ve şike/sabotaj çözümleme kuralları.
   * `BondingRules.js`: Saf gladyatör favori silahları (`+%6` hasar / `+%5` kritik), sadakat kademeleri (`Sadık Yürek`, `İsyankâr`), kişisel istek üretimi/takibi, bağlam duyarlı diyaloglar ve gecelik `%10` isyan riski kuralları.
-  * `Gladiator.js`: Otonom AI `StateMachine`, çoklu hedefleme (`enemies`), yorgunluk/sakatlık/trait/perk hesapları, favori silah (`+%6` hasar / `+%5` kritik), sadakat (`Sadık Yürek` / `İsyankâr` -%10 hız & hasar), ağır silah Hyper-Armor, Hz-bağımsız hız sönümlemesi, buff/debuff'lar, sabotaj (`sabotaged`) ve şike (`bribeThrow`) ile tüketilebilir eşya tetikleyicileri.
-  * `ArenaScene.js`: 1v1 ve 2v2 takım yönetimi, 2.5D şerit yerleşimi, dinamik kamera, bölge teması (`regionId`).
+  * `RelationAndBetRules.js`: Saf ikili yoldaşlık/rekabet (`RelationRules`: `-100..+100`, `Silah Kardeşi` / `Rakip`, 2v2 sinerjisi, avlu gecelik etkileşimleri) ve Arena Bahis Sistemi (`BettingRules`: dinamik güç oranı, *Zafer* ve *<20sn Hızlı Zafer* bahisleri) kuralları.
+  * `Gladiator.js`: Otonom AI `StateMachine`, çoklu hedefleme (`enemies`), yorgunluk/sakatlık/trait/perk hesapları, favori silah (`+%6` hasar / `+%5` kritik), 2v2 takım sinerjisi (`allySynergy`), sadakat (`Sadık Yürek` / `İsyankâr` -%10 hız & hasar), ağır silah Hyper-Armor, Hz-bağımsız hız sönümlemesi, buff/debuff'lar, sabotaj (`sabotaged`) ve şike (`bribeThrow`) ile tüketilebilir eşya tetikleyicileri.
+  * `ArenaScene.js`: 1v1 ve 2v2 takım yönetimi, 2.5D şerit yerleşimi, dinamik kamera, bölge teması (`regionId`) ve 2v2 sinerji savaş kaydı duyurusu.
   * `LudusScene.js`: Ludus sekmesindeki canlı avlu ve eğitim animasyonları.
-  * `LudusManager.js`: Ekonomi, kadro, binalar, günlük kontratlar, Senato kontratları & şike teklifleri, gladyatör bağ kurma (`talkToGladiator`, `giftWineToGladiator`, `assignPrivateQuarters`, `declineGladiatorRequest`, kişisel istekler, favori silahlar), kariyer bölgesi seçimi, turnuva akışı, `startNewGamePlus()`, `localStorage` + JSON Import/Export + `_migrateState()` + `🛠️ Test` geliştirici araçları (`devLowLoyalty`, `devNewRequest`, `devGenerateSenateContract`, `devSpawnBribeOffer` vb.).
+  * `LudusManager.js`: Ekonomi, kadro, binalar, günlük kontratlar, Senato kontratları & şike teklifleri, gladyatör bağ kurma (`talkToGladiator`, `giftWineToGladiator`, `assignPrivateQuarters`, `declineGladiatorRequest`), ortak talim (`sparTogether`), Arena bahisleri (`getMatchOdds`, `placeMatchBet`), kariyer bölgesi seçimi, turnuva akışı, `startNewGamePlus()`, `localStorage` + JSON Import/Export + `_migrateState()` + `🛠️ Test` geliştirici araçları.
   * `main.js`: Tüm UI render ve olay bağlantıları.
 * `tests/` & Sunucu:
-  * `tests/combat_rules.test.js` (5), `tests/phase7_rules.test.js` (4), `tests/bugs_balance.test.js` (7), `tests/career_rules.test.js` (4), `tests/senate_rules.test.js` (4) ve `tests/bonding_rules.test.js` (5) — toplam 29 adet `node:test` birim ve simülasyon testi (`npm test`).
+  * `tests/combat_rules.test.js` (5), `tests/phase7_rules.test.js` (4), `tests/bugs_balance.test.js` (7), `tests/career_rules.test.js` (4), `tests/senate_rules.test.js` (4), `tests/bonding_rules.test.js` (5) ve `tests/relation_bet_rules.test.js` (4) — toplam 33 adet `node:test` birim ve simülasyon testi (`npm test`).
   * `server.js` (Express v5 statik sunucu, `0.0.0.0:3000`).
 
 ---
@@ -69,11 +71,15 @@
   * **Günlük Senato Kontratları:** Kalkansız zafer, ağır silah, ölümüne maç, zehirli zafer, 22 sn altı hızlı zafer ve 2v2 görevleri; Arena'da kabul/reddet ve maç sonu otomatik ödül + itibar kazanımı.
   * **Şike & Sabotaj Teklifleri:** 1v1 maçlarda `throw_match` (bilerek yere düşüp büyük rüşvet alma) ve `sabotage_enemy` (rakibe -%25 can / -%20 güç-hız sabotajı); yakalanma riski ve skandal cezası mekaniği.
 
-* ✅ **Bağ Kurma, Favori Silahlar & Kişisel İstekler (v0.9.6 — Mevcut):**
+* ✅ **Bağ Kurma, Favori Silahlar & Kişisel İstekler (v0.9.6):**
   * **Favori Silahlar:** Pazarda dahi görünen favori silah kuşanıldığında `+%6` Hasar ve `+%5` Kritik Şansı verir; diğer silahları cezalandırmaz.
   * **Sadakat (`0–100`) & İsyan Riski:** `75+` (`❤️ Sadık Yürek`) maçta 1 kez `%25` can altında `+10` Stamina ve `+5` Zırh tetikler; `25` altı (`⚠️ İsyankâr`) arenada `-%10` Hasar/Hız, eğitimde `+%15` maliyet ve gecede `%10` ihtimalle tüm kadroya `-6` moral düşüşü yaratır.
   * **Kişisel İstekler:** Revir/dinlenme → favori silah → üst seviye silah → favori silahla zafer öncelik sırası (10 zafer özgürlük/Doctore isteği asla çıkmaz).
   * **Günlük Ludus Jestleri & Diyalog:** Ücretsiz `🗣️ Sohbet Et`, `🍷 Şarap İkram Et (25 Altın)` ve kalıcı `🛏️ Özel Oda Tahsis Et (180 Altın)`.
+
+* ✅ **Yoldaşlık/Rekabet & Arena Bahis Sistemi (v0.9.7 — Mevcut):**
+  * **Gladyatörler Arası Yoldaşlık & Rekabet:** Kadrodaki gladyatörler arasında `-100..+100` ilişki puanı; `⚔️ Birlikte Talim` günlük aksiyonu (`+6/+8` ilişki, `+15 XP`), gecelik avlu etkileşimleri ve `2v2` maçlarda aktif sinerji (`⚔️ Silah Kardeşi` `+%6` hasar & `+3` zırh, `🤝 Uyumlu` `+%3` hasar, `⚡ Rakip` `+%5` kritik & `-3` zırh).
+  * **Arena Bahis Sistemi:** Maç öncesi dinamik güç karşılaştırmasına göre canlı oranlar (`1.30x–2.95x` Zafer Bahsi, `2.05x–4.35x` `<20sn` Hızlı Zafer Bahsi), `25/50/100 Altın` bahis seçimi, şike (`throw_match`) ile kendi galibiyetine bahis engelleyici ve maç sonu otomatik kupon ödemesi.
 
 ---
 
@@ -103,5 +109,5 @@
 3. Görsel değişiklikleri mümkün olduğunca `game/renderers/` içine izole et.
 4. Tarayıcı iframe engeli nedeniyle asla `window.alert`, `window.confirm` veya `window.open` kullanma; onaylar için mevcut `#confirm-modal` yapısını kullan.
 5. Gladyatör kişisel isteklerinde **asla** "10 zaferde özgürlük (Rudis)" veya "Doctore olma" isteği üretme (oyuncu özgürlüğü ve tercih doğrultusu korunur).
-6. Değişiklik sonrası `npm test` (`29/29` test) ve `npm run lint` doğrulamalarını mutlaka çalıştır.
+6. Değişiklik sonrası `npm test` (`33/33` test) ve `npm run lint` doğrulamalarını mutlaka çalıştır.
 

@@ -40,9 +40,12 @@
     const arenaFighterSelect2 = document.getElementById('arena-fighter-select-2');
     const arenaConsumable2Wrap = document.getElementById('arena-consumable-2-wrap');
     const arenaConsumableSelect2 = document.getElementById('arena-consumable-select-2');
+    const arena2v2SynergyBar = document.getElementById('arena-2v2-synergy-bar');
     const careerLadderPanel = document.getElementById('career-ladder-panel');
     const senatePanel = document.getElementById('senate-panel');
+    const arenaBettingPanel = document.getElementById('arena-betting-panel');
     const arenaOpponentsList = document.getElementById('arena-opponents-list');
+    let selectedBet = { type: 'none', stake: 50 };
 
     const doctoreBanner = document.getElementById('doctore-banner');
     const romanEventModal = document.getElementById('roman-event-modal');
@@ -404,6 +407,45 @@
                 </div>
 
                 ${requestHtml}
+                ${(() => {
+                    const teammates = ludus.state.roster.filter(r => r.id !== sel.id);
+                    if (teammates.length === 0 || !Game.RelationRules) return '';
+                    const selSparedToday = sel.lastSparDay === ludus.state.day;
+                    const rowsHtml = teammates.map(other => {
+                        const score = ludus.getRelationBetween(sel.id, other.id);
+                        const tier = Game.RelationRules.getRelationTier(score);
+                        const otherSparedToday = other.lastSparDay === ludus.state.day;
+                        const sparDisabled = selSparedToday || otherSparedToday;
+                        const btnLabel = sparDisabled
+                            ? '✔️ Bugün Talim Yapıldı'
+                            : '⚔️ Birlikte Talim (+İlişki, +15 XP)';
+                        return `
+                            <div class="relation-row">
+                                <div class="relation-meta">
+                                    <div class="relation-title-line">
+                                        <strong>${other.name}</strong>
+                                        <span>· ${tier.badge}</span>
+                                        <span class="relation-score ${tier.id}">(${score >= 0 ? '+' : ''}${score})</span>
+                                    </div>
+                                    <div class="relation-effect-line">${tier.desc}</div>
+                                </div>
+                                <button type="button" class="spar-btn" data-partner-id="${other.id}" ${sparDisabled ? 'disabled' : ''}>
+                                    ${btnLabel}
+                                </button>
+                            </div>
+                        `;
+                    }).join('');
+
+                    return `
+                        <div class="relations-panel">
+                            <div class="relations-head">
+                                <strong>🤝 Avlu İlişkileri (2v2 Yoldaşlık & Rekabet)</strong>
+                                <span class="relations-sub">40+ Silah Kardeşi · -30 altı Rakip</span>
+                            </div>
+                            <div class="relations-list">${rowsHtml}</div>
+                        </div>
+                    `;
+                })()}
                 ${perkChoiceHTML}
 
                 <div class="style-select-box">
@@ -541,6 +583,24 @@
                     renderAll();
                 });
             }
+
+            detailEl.querySelectorAll('.spar-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const partnerId = btn.dataset.partnerId;
+                    const res = ludus.sparTogether(sel.id, partnerId);
+                    if (!res.ok) {
+                        showToast(res.msg || 'Talim yapılamadı.', true);
+                    } else {
+                        ludusScene.triggerAnim(sel.id, 'TRAIN_AGI');
+                        ludusScene.triggerAnim(partnerId, 'TRAIN_STR');
+                        const lvlNote = res.leveledNames && res.leveledNames.length > 0
+                            ? ` 🌟 Seviye Atladı: ${res.leveledNames.join(', ')}!`
+                            : '';
+                        showToast(`⚔️ ${sel.name} ortak talim yaptı (+${res.relationDelta} İlişki → ${res.tier.badge}, +${res.xpEach} XP)${lvlNote}`);
+                    }
+                    renderAll();
+                });
+            });
 
             const doctoreBtn = document.getElementById('btn-retire-doctore');
             if (doctoreBtn) {
@@ -732,7 +792,28 @@
 
         arenaFighterSelect.onchange = () => {
             ludus.state.selectedGladiatorId = arenaFighterSelect.value;
+            renderArenaTab();
         };
+        arenaFighterSelect2.onchange = () => {
+            renderArenaTab();
+        };
+
+        const render2v2SynergyPreview = () => {
+            if (!arena2v2SynergyBar) return;
+            if (!has2v2Today || arenaFighterSelect.value === arenaFighterSelect2.value) {
+                arena2v2SynergyBar.className = 'synergy-preview-bar hidden';
+                arena2v2SynergyBar.textContent = '';
+                return;
+            }
+            const syn = ludus.get2v2Synergy(arenaFighterSelect.value, arenaFighterSelect2.value);
+            if (!syn) {
+                arena2v2SynergyBar.className = 'synergy-preview-bar hidden';
+                return;
+            }
+            arena2v2SynergyBar.className = `synergy-preview-bar ${syn.tier.id}`;
+            arena2v2SynergyBar.textContent = `🤝 2v2 Takım Sinerjisi — ${syn.summary}`;
+        };
+        render2v2SynergyPreview();
 
         const fillConsumableSelect = (selEl) => {
             const prev = selEl.value;
@@ -791,6 +872,7 @@
 
         renderCareerLadder();
         renderSenatePanel();
+        renderBettingPanel();
 
         arenaOpponentsList.innerHTML = '';
         ludus.state.dailyOpponents.forEach(opp => {
@@ -853,6 +935,25 @@
                 `;
             }
 
+            const fighterIdsForOdds = (opp.ruleId === 'team_2v2' && opp.partner)
+                ? [arenaFighterSelect.value, arenaFighterSelect2.value]
+                : [arenaFighterSelect.value];
+            const odds = !opp.completed ? ludus.getMatchOdds(fighterIdsForOdds, opp) : null;
+            const throwBribeActive = Boolean(opp.bribeOffer && opp.bribeOffer.accepted && opp.bribeOffer.type === 'throw_match');
+            let oddsHTML = '';
+            if (odds) {
+                oddsHTML = `<div class="oc-odds-line">🎲 Oranlar: Zafer ${odds.winOdds.toFixed(2)}x · &lt;20sn ${odds.fastWinOdds.toFixed(2)}x (${odds.outlook})</div>`;
+                if (selectedBet.type !== 'none') {
+                    if (throwBribeActive) {
+                        oddsHTML += `<div class="oc-bet-preview blocked">⚠️ Şike (bilerek yenilme) aktif — bahis kapalı</div>`;
+                    } else {
+                        const mult = selectedBet.type === 'fast_win' ? odds.fastWinOdds : odds.winOdds;
+                        const payout = Math.round(selectedBet.stake * mult);
+                        oddsHTML += `<div class="oc-bet-preview">🎯 Seçili Bahis: 🪙${selectedBet.stake} → Olası Ödeme 🪙${payout}</div>`;
+                    }
+                }
+            }
+
             const card = document.createElement('div');
             card.className = cardClass;
             card.innerHTML = `
@@ -872,6 +973,7 @@
                     <div>⚔️ ${w.name}${s.hasShield ? ' + ' + s.name : ''}</div>
                     <div>🛡️ ${a.name}${h.id !== 'none' ? ' + ' + h.name : ''}</div>
                     ${partnerHTML}
+                    ${oddsHTML}
                 </div>
                 ${bribeHTML}
                 <div class="oc-reward">Ödül: 🪙${opp.rewardGold} Altın • 🏛️ +${opp.rewardFame} Şöhret</div>
@@ -899,6 +1001,66 @@
                 startArenaMatch(opp);
             });
             arenaOpponentsList.appendChild(card);
+        });
+    }
+
+    function renderBettingPanel() {
+        if (!arenaBettingPanel || !Game.BettingRules) return;
+        const bStats = ludus.state.bettingStats || { totalWagered: 0, totalWon: 0, betsWon: 0, betsLost: 0 };
+        const statsText = bStats.totalWagered > 0
+            ? `Kuponlar: ${bStats.betsWon} Kazanan / ${bStats.betsLost} Kayıp · Bahis: 🪙${bStats.totalWagered} → Ödeme: 🪙${bStats.totalWon}`
+            : 'Maç öncesi bahis seçip aşağıdaki rakiplerden birine girin (altın maç başlarken kesilir)';
+
+        const typeButtons = [
+            { id: 'none', label: 'Bahis Yok' },
+            { id: 'win', label: '🏆 Zafer Bahsi' },
+            { id: 'fast_win', label: '⚡ Hızlı Zafer (<20sn)' }
+        ].map(t => `
+            <button type="button" class="bet-chip-btn bet-type-btn ${selectedBet.type === t.id ? 'active' : ''}" data-bet-type="${t.id}">
+                ${t.label}
+            </button>
+        `).join('');
+
+        const stakesDisabled = selectedBet.type === 'none';
+        const stakeButtons = Game.BettingRules.STAKES.map(st => `
+            <button type="button" class="bet-chip-btn bet-stake-btn ${!stakesDisabled && selectedBet.stake === st ? 'active' : ''}" data-stake="${st}" ${stakesDisabled ? 'disabled' : ''}>
+                🪙${st}
+            </button>
+        `).join('');
+
+        arenaBettingPanel.innerHTML = `
+            <div class="betting-head">
+                <strong>🎲 Arena Bahis Masası</strong>
+                <span class="betting-stats-line">${statsText}</span>
+            </div>
+            <div class="bet-controls-grid">
+                <div class="bet-group">
+                    <span class="bet-group-label">Tür:</span>
+                    ${typeButtons}
+                </div>
+                <div class="bet-group">
+                    <span class="bet-group-label">Miktar:</span>
+                    ${stakeButtons}
+                </div>
+            </div>
+            <div class="betting-note">
+                ${selectedBet.type === 'none'
+                    ? 'Oranlar seçili dövüşçü ile rakibin gücüne göre dinamik hesaplanır.'
+                    : `Aktif Seçim: ${selectedBet.type === 'fast_win' ? '⚡ Hızlı Zafer (<20sn)' : '🏆 Zafer Bahsi'} · 🪙${selectedBet.stake} (Rakip kartlarında olası ödemeyi görebilirsin)`}
+            </div>
+        `;
+
+        arenaBettingPanel.querySelectorAll('.bet-type-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                selectedBet.type = btn.dataset.betType;
+                renderArenaTab();
+            });
+        });
+        arenaBettingPanel.querySelectorAll('.bet-stake-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                selectedBet.stake = parseInt(btn.dataset.stake, 10) || 50;
+                renderArenaTab();
+            });
         });
     }
 
@@ -1221,7 +1383,26 @@
             return;
         }
 
+        if (Game.BettingRules && selectedBet.type !== 'none') {
+            const oddsCheck = ludus.getMatchOdds(selectedIds, opp);
+            const preCheck = Game.BettingRules.validateBet(selectedBet, ludus.state.gold, opp, oddsCheck);
+            if (!preCheck.ok) {
+                showToast(preCheck.msg, true);
+                return;
+            }
+        }
+
         const launchMatch = () => {
+            const activeBet = ludus.placeMatchBet(selectedIds, opp, selectedBet);
+            if (!activeBet.ok) {
+                showToast(activeBet.msg, true);
+                return;
+            }
+            if (activeBet.active) {
+                selectedBet.type = 'none';
+                renderTopStats();
+            }
+
             const usedConsumables = consIds.map(cid => ludus.consumeArenaItem(cid));
 
             matchInProgress = true;
@@ -1234,10 +1415,16 @@
             const bribeActive = Boolean(opp.bribeOffer && opp.bribeOffer.accepted);
             const isBribeThrow = bribeActive && opp.bribeOffer.type === 'throw_match';
             const isEnemySabotaged = bribeActive && opp.bribeOffer.type === 'sabotage_enemy';
+            const pairSynergy = (is2v2 && selectedIds.length >= 2)
+                ? ludus.get2v2Synergy(selectedIds[0], selectedIds[1])
+                : null;
 
             const leftConfigs = myGlads.map((g, idx) => Object.assign(
                 toGladiatorConfig(g, false, usedConsumables[idx] || null),
-                { bribeThrow: idx === 0 && isBribeThrow }
+                {
+                    bribeThrow: idx === 0 && isBribeThrow,
+                    allySynergy: pairSynergy
+                }
             ));
             const rightConfigs = is2v2
                 ? [toGladiatorConfig(opp, false), toGladiatorConfig(opp.partner, false)]
@@ -1256,22 +1443,26 @@
                 const remHps = currentArena.leftTeam.map(f => f.hp);
 
                 if (opp.isTournament) {
-                    const res = ludus.recordTournamentMatchResult(selectedIds[0], opp, didWin, remHps[0]);
+                    const res = ludus.recordTournamentMatchResult(selectedIds[0], opp, didWin, remHps[0], {
+                        durationSec: currentArena.matchTime,
+                        activeBet
+                    });
                     renderTopStats();
+                    const betNote = res.betResult ? ` • ${res.betResult.summary}` : '';
 
                     if (res.wonChampionship) {
                         const lvlMsg = res.leveledNames.length > 0 ? ` 🌟 SEVİYE ATLADI: ${res.leveledNames.join(', ')}!` : '';
-                        winnerText.textContent = `👑 İMPARATORLUK ŞAMPİYONU! +${res.goldEarned} Altın, +${res.fameEarned} Şöhret (+${res.xpReward} XP)${lvlMsg}`;
+                        winnerText.textContent = `👑 İMPARATORLUK ŞAMPİYONU! +${res.goldEarned} Altın, +${res.fameEarned} Şöhret (+${res.xpReward} XP)${lvlMsg}${betNote}`;
                         pendingChampionCeremony = { fighterId: selectedIds[0], res };
                         returnLudusBtn.textContent = '👑 Taç Törenini Gör!';
                     } else if (didWin && res.nextRound) {
                         const healNote = res.breatherHeal > 0 ? ` • 💚 +${res.breatherHeal} Soluklanma Canı` : '';
-                        winnerText.textContent = `🏆 TUR ${opp.tournamentRound}/3 KAZANILDI! +${res.goldEarned} Altın (+${res.xpReward} XP)${healNote}`;
+                        winnerText.textContent = `🏆 TUR ${opp.tournamentRound}/3 KAZANILDI! +${res.goldEarned} Altın (+${res.xpReward} XP)${healNote}${betNote}`;
                         pendingReturnTab = 'arena';
                         returnLudusBtn.textContent = `⚔️ Arena'ya Dön (Tur ${res.nextRound}/3)`;
                     } else {
                         const injTxt = res.injuries.length > 0 ? ` • 🩹 ${res.injuries[0]}` : '';
-                        winnerText.textContent = `💀 Turnuvadan Elendin (${opp.tournamentRound}/3)! (+${res.goldEarned} Altın, +${res.xpReward} XP${injTxt})`;
+                        winnerText.textContent = `💀 Turnuvadan Elendin (${opp.tournamentRound}/3)! (+${res.goldEarned} Altın, +${res.xpReward} XP${injTxt})${betNote}`;
                     }
                     winnerBanner.classList.remove('hidden');
                     return;
@@ -1279,7 +1470,8 @@
 
                 const res = ludus.recordTeamMatchResult(selectedIds, opp.id, didWin, remHps, {
                     durationSec: currentArena.matchTime,
-                    consumablesUsed: usedConsumables.map(c => (c ? c.id : null))
+                    consumablesUsed: usedConsumables.map(c => (c ? c.id : null)),
+                    activeBet
                 });
                 renderTopStats();
 
@@ -1287,6 +1479,10 @@
                     ? ` • 📜 SENATO KONTRATI TAMAMLANDI (${res.contractCompleted.title}: +${res.contractCompleted.rewardGold} Altın, +${res.contractCompleted.repReward} İtibar)!`
                     : '';
                 const bribeNote = res.bribeResult ? ` • ${res.bribeResult.summary}` : '';
+                const betNote = res.betResult ? ` • ${res.betResult.summary}` : '';
+                const relNote = res.relationUpdate
+                    ? ` • 🤝 Takım İlişkisi +${res.relationUpdate.delta}${res.relationUpdate.promotedTier ? ` (${res.relationUpdate.promotedTier.badge}!)` : ''}`
+                    : '';
 
                 const reqNote = (res.fulfilledRequests && res.fulfilledRequests.length > 0)
                     ? ` • 💬 İSTEK TAMAMLANDI: ${res.fulfilledRequests.map(r => r.name).join(', ')}!`
@@ -1295,15 +1491,15 @@
                 if (didWin) {
                     const lvlMsg = res.leveledNames.length > 0 ? ` 🌟 SEVİYE ATLADI: ${res.leveledNames.join(', ')}!` : '';
                     const promoMsg = res.promotedRegion ? ` • 🗺️ YENİ BÖLGE: ${res.promotedRegion.icon} ${res.promotedRegion.name}!` : '';
-                    winnerText.textContent = `🏆 ZAFER! +${res.goldEarned} Altın, +${res.fameEarned} Şöhret (+${res.xpReward} XP)${lvlMsg}${promoMsg}${contractNote}${bribeNote}${reqNote}`;
+                    winnerText.textContent = `🏆 ZAFER! +${res.goldEarned} Altın, +${res.fameEarned} Şöhret (+${res.xpReward} XP)${lvlMsg}${promoMsg}${contractNote}${bribeNote}${betNote}${relNote}${reqNote}`;
                 } else if (res.deadNames.length > 0) {
                     const rookieMsg = res.rescuedByRookie ? ' (Sokaktan yeni bir çaylak katıldı!)' : '';
-                    winnerText.textContent = `⚰️ ${res.deadNames.join(', ')} ARENADA CAN VERDİ!${rookieMsg}${bribeNote}`;
+                    winnerText.textContent = `⚰️ ${res.deadNames.join(', ')} ARENADA CAN VERDİ!${rookieMsg}${bribeNote}${betNote}`;
                 } else if (res.bribeResult && res.bribeResult.keptDeal && res.bribeResult.type === 'throw_match') {
-                    winnerText.textContent = `🎭 ŞİKE MAÇI BİTTİ! ${res.bribeResult.summary} (+${res.xpReward} XP)`;
+                    winnerText.textContent = `🎭 ŞİKE MAÇI BİTTİ! ${res.bribeResult.summary} (+${res.xpReward} XP)${betNote}`;
                 } else {
                     const injTxt = res.injuries.length > 0 ? ` • 🩹 ${res.injuries[0]}` : '';
-                    winnerText.textContent = `💀 YENİLGİ! (+${res.goldEarned} Altın, +${res.xpReward} XP${injTxt})${bribeNote}`;
+                    winnerText.textContent = `💀 YENİLGİ! (+${res.goldEarned} Altın, +${res.xpReward} XP${injTxt})${bribeNote}${betNote}${relNote}`;
                 }
                 winnerBanner.classList.remove('hidden');
             });
@@ -1590,6 +1786,9 @@
         const floorNote = info.starvationFloorApplied
             ? ' (Savaşçı %25 dövüş sınırına toparlandı)'
             : '';
+        const relNote = (info.relationEvents && info.relationEvents.triggered && info.relationEvents.events.length > 0)
+            ? ` • ${info.relationEvents.events[0].summary}`
+            : '';
         const rebellionTriggered = info.rebellionReport && info.rebellionReport.triggered;
 
         if (rebellionTriggered) {
@@ -1597,9 +1796,9 @@
         } else if (info.starved) {
             showToast(`⚠️ Erzak parası yetmedi (-🪙${info.upkeep})! Kadro az iyileşti ve sadakat düştü${floorNote}.`, true);
         } else if (isBoss) {
-            showToast(`👑 Gün ${ludus.state.day}: ŞAMPİYONA BOSS GÜNÜ! (-🪙${info.upkeep})${injuryNote}${reqNote}`);
+            showToast(`👑 Gün ${ludus.state.day}: ŞAMPİYONA BOSS GÜNÜ! (-🪙${info.upkeep})${injuryNote}${reqNote}${relNote}`);
         } else {
-            showToast(`Gün ${ludus.state.day} başladı! (-🪙${info.upkeep} masraf)${injuryNote}${reqNote}${floorNote}`);
+            showToast(`Gün ${ludus.state.day} başladı! (-🪙${info.upkeep} masraf)${injuryNote}${reqNote}${relNote}${floorNote}`);
         }
         renderAll();
     });

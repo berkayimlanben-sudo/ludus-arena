@@ -104,6 +104,10 @@
                     this.onBattleLog.emit(`🎭 ŞİKE AKTİF: ${f.gladiatorName} bahisçiler için bu maçı vermeye hazırlanıyor...`);
                 }
             });
+            if (this.leftTeam.length >= 2 && this.leftTeam[0].allySynergy && this.leftTeam[0].allySynergy.tier && this.leftTeam[0].allySynergy.tier.id !== 'neutral') {
+                const syn = this.leftTeam[0].allySynergy;
+                this.onBattleLog.emit(`${syn.tier.badge} SİNERJİSİ (${this.leftTeam[0].gladiatorName} & ${this.leftTeam[1].gladiatorName}): ${syn.tier.desc}`);
+            }
             this.rightTeam.forEach(f => {
                 if (f.sabotaged) {
                     this.onBattleLog.emit(`🧪 SABOTAJ: ${f.gladiatorName} zehirli şaraptan ötürü bitkin (-%25 Can, -%20 Güç/Hız)!`);
