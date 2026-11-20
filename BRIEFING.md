@@ -1,7 +1,7 @@
 # ⚔️ LUDUS ARENA — Proje Özeti ve AI Devir Teslim (Handoff) Dokümanı
 
 **Repo:** `https://github.com/berkayimlanben-sudo/ludus-arena`  
-**Mevcut Sürüm:** `v0.9.7` (2v2 Yoldaşlık & Rekabet Sinerjisi + Arena Bahis Sistemi tamamlandı)  
+**Mevcut Sürüm:** `v0.9.8` (Seyirci Coşkusu *Sparsio* & İmparatorun Başparmağı *Pollice Verso* tamamlandı)  
 **AI & Mimari Rehberleri:** Teknik kurallar için `AGENTS.md`, motor/döngü mimarisi için `ARCHITECTURE.md` dosyalarına bak.  
 **Hedef:** Sıfır kurulumlu, tarayıcıda (`file://`, Express statik sunucu ve GitHub Pages) çalışan **2D Side-View Auto-Battler + Ludus Management (Gladyatör Menajerlik)** web oyunu (*Domina* ve *Swords & Sandals* esintili).
 
@@ -16,7 +16,7 @@
 
 ## 2. Teknik Mimari ve Dosya Yapısı
 * **Önemli Kural:** Proje **build aracı ve ES Module (`import/export`) KULLANMAZ**. Global namespace (`window.LudusEngine`, `window.LudusData`, `window.LudusGame`) ve IIFE modül yapısı kullanılır. Dosya adları büyük/küçük harfe duyarlıdır (Linux/GitHub Pages uyumu).
-* **Mantık / Görünüm Ayrımı:** Savaş/yapay zeka mantığı (`Gladiator.js`, `ArenaScene.js`, `LudusScene.js`) çizim kodlarından (`game/renderers/`) tamamen ayrıdır; saf oyun kuralları `CombatRules.js`, `Phase7Rules.js`, `CareerRules.js`, `SenateRules.js`, `BondingRules.js` ve `RelationAndBetRules.js` içinde test edilebilir şekilde ayrıştırılmıştır.
+* **Mantık / Görünüm Ayrımı:** Savaş/yapay zeka mantığı (`Gladiator.js`, `ArenaScene.js`, `LudusScene.js`) çizim kodlarından (`game/renderers/`) tamamen ayrıdır; saf oyun kuralları `CombatRules.js`, `CrowdRules.js`, `Phase7Rules.js`, `CareerRules.js`, `SenateRules.js`, `BondingRules.js` ve `RelationAndBetRules.js` içinde test edilebilir şekilde ayrıştırılmıştır.
 
 ### Klasör Ağacı
 * `index.html` & `style.css`: Sekmeli yönetim arayüzü (`Ludus`, `Demirci`, `Pazar`, `Arena`) + Test paneli (`#dev-panel`) + 1v1/2v2 HUD + Roma Olay Kartı (`#roman-event-modal`) + oyun içi Onay Penceresi (`#confirm-modal`) + İmparatorluk Şampiyonu / NG+ penceresi (`#champion-modal`).
@@ -28,24 +28,25 @@
   * `LudusConfig.js`: `GLADIATOR_NAMES`, `ORIGINS`, `SKIN_TONES`, `FIGHT_STYLES`, `TRAITS`, `PERKS`, `ARENA_RULES`, `INJURIES`, `BUILDINGS`, `ARENA_TIERS`, `BOSSES`, `ROMAN_EVENTS` (5 karar odaklı olay kartı), `CAREER_REGIONS` (4 kariyer bölgesi), `IMPERIAL_TOURNAMENT` (3 final rakibi), `SENATORS` (Crassus, Tullius, Valeria) ve `SENATE_CONTRACT_TEMPLATES` (6 Senato kontratı).
 * `game/renderers/`:
   * `GladiatorRenderer.js`: Sert/gölgeli 2D anatomik savaşçılar, ekipmanların görsel değişimi, boss pelerini/ölçeği (`1.18x`) ve `stun`, `slow` ile `poison` (yeşil zehir halkası + yükselen kabarcıklar) görselleri.
-  * `ArenaRenderer.js`: 4 kariyer bölgesine (`capua`, `provincial`, `colosseum`, `imperial`) göre dinamik renk/atmosfer sunan Kolezyum arenası.
+  * `ArenaRenderer.js`: 4 kariyer bölgesine (`capua`, `provincial`, `colosseum`, `imperial`) göre dinamik renk/atmosfer sunan Kolezyum arenası, İmparator Locası (*Imperial Box*) silueti ve yüksek coşkuda (`60+`) altın tribün kıvılcımları.
   * `LudusRenderer.js`: Revir, Demirci örsü ve Tahta Eğitim Kuklası (Palus) bulunan canlı avlu.
 * `game/`:
   * `SoundFX.js`
   * `Particles.js`: Kan, kıvılcım, toz, yeşil zehir damlacıkları (`spawnPoison`) ve yüzen hasar/durum metinleri (`spawnText`).
   * `CombatRules.js`: Saf 2.5D şerit koordinatları (`getLaneY`), takım içi hedef dağıtımı (`selectBestTarget`), dost geçişli çarpışma itmesi (`computeOverlapPushX`) ve Y-derinlik sıralaması (`sortArenaChildren`).
+  * `CrowdRules.js`: Saf seyirci coşkusu (`0–100`), olay bazlı favori artışı (`hit`/`crit`/`block`/`ko`/taktikler), *Sparsio* zafer bahşişi çarpanları ve ölümüne maçlarda *Pollice Verso* (İmparator merhameti) olasılık/çözüm kuralları.
   * `Phase7Rules.js`: Saf Doctore ve Roma Olay Kartı kuralları (`getDoctoreBonuses`, `canRetireAsDoctore`, `createDoctoreRecord`, `computeEffectiveXp`, `shouldTriggerRomanEvent`, `pickRomanEvent`, `resolveRomanEventChoice`).
   * `CareerRules.js`: Saf 4 bölgeli kariyer merdiveni, 3 maçlık İmparatorluk Turnuvası ve New Game+ taşıma kuralları.
   * `SenateRules.js`: Saf Senatör itibarları (`crassus`, `tullius`, `valeria`), günlük Senato kontratları ve şike/sabotaj çözümleme kuralları.
   * `BondingRules.js`: Saf gladyatör favori silahları (`+%6` hasar / `+%5` kritik), sadakat kademeleri (`Sadık Yürek`, `İsyankâr`), kişisel istek üretimi/takibi, bağlam duyarlı diyaloglar ve gecelik `%10` isyan riski kuralları.
   * `RelationAndBetRules.js`: Saf ikili yoldaşlık/rekabet (`RelationRules`: `-100..+100`, `Silah Kardeşi` / `Rakip`, 2v2 sinerjisi, avlu gecelik etkileşimleri) ve Arena Bahis Sistemi (`BettingRules`: dinamik güç oranı, *Zafer* ve *<20sn Hızlı Zafer* bahisleri) kuralları.
-  * `Gladiator.js`: Otonom AI `StateMachine`, çoklu hedefleme (`enemies`), yorgunluk/sakatlık/trait/perk hesapları, favori silah (`+%6` hasar / `+%5` kritik), 2v2 takım sinerjisi (`allySynergy`), sadakat (`Sadık Yürek` / `İsyankâr` -%10 hız & hasar), ağır silah Hyper-Armor, Hz-bağımsız hız sönümlemesi, buff/debuff'lar, sabotaj (`sabotaged`) ve şike (`bribeThrow`) ile tüketilebilir eşya tetikleyicileri.
-  * `ArenaScene.js`: 1v1 ve 2v2 takım yönetimi, 2.5D şerit yerleşimi, dinamik kamera, bölge teması (`regionId`) ve 2v2 sinerji savaş kaydı duyurusu.
+  * `Gladiator.js`: Otonom AI `StateMachine`, çoklu hedefleme (`enemies`), yorgunluk/sakatlık/trait/perk hesapları, favori silah (`+%6` hasar / `+%5` kritik), 2v2 takım sinerjisi (`allySynergy`), sadakat (`Sadık Yürek` / `İsyankâr` -%10 hız & hasar), ağır silah Hyper-Armor, Hz-bağımsız hız sönümlemesi, buff/debuff'lar, `onCombatEvent` sinyali, sabotaj (`sabotaged`) ve şike (`bribeThrow`) ile tüketilebilir eşya tetikleyicileri.
+  * `ArenaScene.js`: 1v1 ve 2v2 takım yönetimi, 2.5D şerit yerleşimi, dinamik kamera, bölge teması (`regionId`), canlı `crowdFavor` sayacı (`peakCrowdFavor`, kademe duyuruları) ve 2v2 sinerji savaş kaydı duyurusu.
   * `LudusScene.js`: Ludus sekmesindeki canlı avlu ve eğitim animasyonları.
-  * `LudusManager.js`: Ekonomi, kadro, binalar, günlük kontratlar, Senato kontratları & şike teklifleri, gladyatör bağ kurma (`talkToGladiator`, `giftWineToGladiator`, `assignPrivateQuarters`, `declineGladiatorRequest`), ortak talim (`sparTogether`), Arena bahisleri (`getMatchOdds`, `placeMatchBet`), kariyer bölgesi seçimi, turnuva akışı, `startNewGamePlus()`, `localStorage` + JSON Import/Export + `_migrateState()` + `🛠️ Test` geliştirici araçları.
+  * `LudusManager.js`: Ekonomi, kadro, binalar, günlük kontratlar, Senato kontratları & şike teklifleri, gladyatör bağ kurma (`talkToGladiator`, `giftWineToGladiator`, `assignPrivateQuarters`, `declineGladiatorRequest`), ortak talim (`sparTogether`), Arena bahisleri (`getMatchOdds`, `placeMatchBet`), *Sparsio* bahşişleri & *Pollice Verso* merhamet çözümü (`crowdStats`), kariyer bölgesi seçimi, turnuva akışı, `startNewGamePlus()`, `localStorage` + JSON Import/Export + `_migrateState()` + `🛠️ Test` geliştirici araçları.
   * `main.js`: Tüm UI render ve olay bağlantıları.
 * `tests/` & Sunucu:
-  * `tests/combat_rules.test.js` (5), `tests/phase7_rules.test.js` (4), `tests/bugs_balance.test.js` (7), `tests/career_rules.test.js` (4), `tests/senate_rules.test.js` (4), `tests/bonding_rules.test.js` (5) ve `tests/relation_bet_rules.test.js` (4) — toplam 33 adet `node:test` birim ve simülasyon testi (`npm test`).
+  * `tests/combat_rules.test.js` (5), `tests/phase7_rules.test.js` (4), `tests/bugs_balance.test.js` (7), `tests/career_rules.test.js` (4), `tests/senate_rules.test.js` (4), `tests/bonding_rules.test.js` (5), `tests/relation_bet_rules.test.js` (4) ve `tests/crowd_rules.test.js` (4) — toplam 37 adet `node:test` birim ve simülasyon testi (`npm test`).
   * `server.js` (Express v5 statik sunucu, `0.0.0.0:3000`).
 
 ---
@@ -77,9 +78,15 @@
   * **Kişisel İstekler:** Revir/dinlenme → favori silah → üst seviye silah → favori silahla zafer öncelik sırası (10 zafer özgürlük/Doctore isteği asla çıkmaz).
   * **Günlük Ludus Jestleri & Diyalog:** Ücretsiz `🗣️ Sohbet Et`, `🍷 Şarap İkram Et (25 Altın)` ve kalıcı `🛏️ Özel Oda Tahsis Et (180 Altın)`.
 
-* ✅ **Yoldaşlık/Rekabet & Arena Bahis Sistemi (v0.9.7 — Mevcut):**
+* ✅ **Yoldaşlık/Rekabet & Arena Bahis Sistemi (v0.9.7):**
   * **Gladyatörler Arası Yoldaşlık & Rekabet:** Kadrodaki gladyatörler arasında `-100..+100` ilişki puanı; `⚔️ Birlikte Talim` günlük aksiyonu (`+6/+8` ilişki, `+15 XP`), gecelik avlu etkileşimleri ve `2v2` maçlarda aktif sinerji (`⚔️ Silah Kardeşi` `+%6` hasar & `+3` zırh, `🤝 Uyumlu` `+%3` hasar, `⚡ Rakip` `+%5` kritik & `-3` zırh).
   * **Arena Bahis Sistemi:** Maç öncesi dinamik güç karşılaştırmasına göre canlı oranlar (`1.30x–2.95x` Zafer Bahsi, `2.05x–4.35x` `<20sn` Hızlı Zafer Bahsi), `25/50/100 Altın` bahis seçimi, şike (`throw_match`) ile kendi galibiyetine bahis engelleyici ve maç sonu otomatik kupon ödemesi.
+
+* ✅ **Seyirci Coşkusu & İmparatorun Başparmağı — *Pollice Verso* (v0.9.8 — Mevcut):**
+  * **Canlı Seyirci Coşkusu (`0–100`):** Arena HUD üzerinde canlı coşku barı; vuruş (`+4`), kritik (`+14`), blok (`+8`), `%30` can altı geri dönüş (`+5`), nakavt (`+18`) ve `MORAL VER!` (`+22`) ile yükselir, zamanla yavaşça soğur (`-1.4/sn`). `crowd_favorite` özelliği `1.25x` çarpan sağlar.
+  * **Sparsio (Seyirci Bahşişi):** `30+` (*İlgili Kalabalık*, `+%8` Altın / `+2` Şöhret), `60+` (*Coşkulu Arena*, `+%18` / `+5`) ve `85+` (*Çılgın Kitle*, `+%30` / `+10`) kademelerinde galibiyet ödülüne ek bahşiş kazandırır.
+  * **Pollice Verso (*Missio* / Merhamet):** Ölümüne maçlarda kaybeden gladyatörün coşku seviyesi (`%15`/`%32`/`%50`), `crowd_favorite` (`+%12`) ve Senatör Tullius itibarı (maks `+%10`, tavan `%75`) ile İmparatorun başparmağını yukarı kaldırma (`👍 MISSIO!`) şansı doğar; bağışlanan savaşçı `1 Can`, sakatlık ve `+15 Sadakat` ile hayatta kalır (şike ile bilerek yenilmede merhamet çalışmaz).
+  * **Arena Görsel Atmosferi:** Ölümüne maçlarda, Kolezyum/İmparatorluk arenasında veya coşku `60+` iken kemer üstünde İmparator Locası (*Imperial Box*) silueti ve tribünlerde altın kıvılcımlar belirir.
 
 ---
 
@@ -97,9 +104,13 @@
 
 ---
 
-## 5. Kalan Yol Haritası (Sıradaki Fazlar)
-* **Faz 8.3 (v1.0) — Son Cila:**
-  * Menülere mini ikonlar, opsiyonel gerçek sesler/efektler, Test panelini ayarlardan aç/kapa ayarı.
+## 5. Kalan Yol Haritası (Planlı Fazlar & İleri Backlog)
+* **Sıradaki Planlı Fazlar:**
+  * **Faz 9.1 — Rakip Ludus'lar & Kan Davası (*Nemesis* Sistemi):** Şehrin rakip okulları, ölümüne maçlarda eski gladyatörünü deviren düşmanların isimlenip güçlenmesi, intikam odaklı kan davası düelloları ve ekstra ödüller.
+  * **Faz 9.2 — Demirci Ustalığı (Silah Bileyi) & Gezici Kervan (*Mercator*):** Demirci binası seviyesine bağlı silah bileyleme/geliştirme (+Hasar / +Kritik) ve nadir günlere özel indirimli/özel eşya sunan gezici tüccar kervanı.
+  * **Faz 10 (v1.0) — Son Cila:** Menülere mini ikonlar, opsiyonel ses efektleri/müzik dokunuşları ve Test panelini ayarlardan aç/kapa ayarı.
+* **İleride / Opsiyonel Eklenebilecekler (Backlog):**
+  * **Vahşi Hayvanlar (*Venatio*) & Arena Tuzakları:** Arenaya aslan/kurt/ayı gibi özel yapay zekâlı vahşi hayvanların ve zemin tuzaklarının eklenmesi.
 
 ---
 
@@ -109,5 +120,5 @@
 3. Görsel değişiklikleri mümkün olduğunca `game/renderers/` içine izole et.
 4. Tarayıcı iframe engeli nedeniyle asla `window.alert`, `window.confirm` veya `window.open` kullanma; onaylar için mevcut `#confirm-modal` yapısını kullan.
 5. Gladyatör kişisel isteklerinde **asla** "10 zaferde özgürlük (Rudis)" veya "Doctore olma" isteği üretme (oyuncu özgürlüğü ve tercih doğrultusu korunur).
-6. Değişiklik sonrası `npm test` (`33/33` test) ve `npm run lint` doğrulamalarını mutlaka çalıştır.
+6. Değişiklik sonrası `npm test` (`37/37` test) ve `npm run lint` doğrulamalarını mutlaka çalıştır.
 

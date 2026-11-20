@@ -12,7 +12,7 @@ Bu dosya, **Ludus Arena** projesinde çalışan tüm yapay zekâ ajanları ve ge
 | `index.html`, `style.css` | Sekmeli UI (`Ludus`, `Demirci`, `Pazar`, `Arena`), modallar (`#confirm-modal`, `#roman-event-modal`, `#champion-modal`) ve `<script>` yükleme sırası. |
 | `game/main.js` | Tüm DOM render işlemleri, kullanıcı olayları, `SceneTree` sahne başlatma ve toast/modal yönetimi. |
 | `game/LudusManager.js` | Oyun durumu (`this.state`), ekonomi, kadro, binalar, kontrat/şike/bağ/ilişki/bahis kuralları, `localStorage` + JSON Import/Export ve `_migrateState()`. |
-| `game/*Rules.js` | DOM ve Canvas'tan izole **saf oyun kuralı modülleri** (`CombatRules`, `Phase7Rules`, `CareerRules`, `SenateRules`, `BondingRules`, `RelationAndBetRules`). |
+| `game/*Rules.js` | DOM ve Canvas'tan izole **saf oyun kuralı modülleri** (`CombatRules`, `CrowdRules`, `Phase7Rules`, `CareerRules`, `SenateRules`, `BondingRules`, `RelationAndBetRules`). |
 | `game/Gladiator.js`, `game/ArenaScene.js`, `game/LudusScene.js` | Otonom dövüşçü AI (`StateMachine`), 1v1/2v2 sahne yönetimi ve Ludus avlu sahnesi. |
 | `game/renderers/` | Canvas 2D çizim katmanı (`ArenaRenderer`, `GladiatorRenderer`, `LudusRenderer`). Oyun mantığı içermez. |
 | `data/` | Statik oyun verileri ve denge tabloları (`Items.js`, `LudusConfig.js`). |
@@ -45,6 +45,6 @@ Bu dosya, **Ludus Arena** projesinde çalışan tüm yapay zekâ ajanları ve ge
 ## 4. Doğrulama Komutları
 Her kod değişikliğinden sonra mutlaka çalıştır:
 ```bash
-npm test      # 33/33 birim ve simülasyon testi (tests/*.test.js)
+npm test      # 37/37 birim ve simülasyon testi (tests/*.test.js)
 npm run lint  # engine/, data/, game/ ve server.js sözdizimi doğrulaması
 ```

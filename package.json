@@ -1,6 +1,6 @@
 {
   "name": "ludus-arena",
-  "version": "0.9.7",
+  "version": "0.9.8",
   "private": true,
   "description": "Ludus Arena — 2D Gladiator Management & Auto-Battler",
   "main": "server.js",

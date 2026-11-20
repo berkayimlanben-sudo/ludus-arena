@@ -1652,3 +1652,78 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .oc-bet-preview.blocked {
     color: #ff8787;
 }
+
+/* v0.9.8 SEYİRCİ COŞKUSU & POLLICE VERSO HUD */
+.crowd-hud-bar {
+    background: #1e1915;
+    border: 1px solid #4a3a28;
+    border-radius: 7px;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.crowd-hud-bar.roaring {
+    border-color: #d97706;
+}
+
+.crowd-hud-bar.frenzied {
+    border-color: #ffd166;
+    background: #241c13;
+}
+
+.crowd-hud-top {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.crowd-tier-label {
+    font-weight: 700;
+    color: #e6d8c3;
+}
+
+.crowd-hud-bar.roaring .crowd-tier-label,
+.crowd-hud-bar.frenzied .crowd-tier-label {
+    color: #ffd166;
+}
+
+.crowd-mercy-label {
+    font-weight: 700;
+    color: #69db7c;
+    font-variant-numeric: tabular-nums;
+}
+
+.crowd-meter-wrap {
+    position: relative;
+    height: 16px;
+    background: #100d0a;
+    border: 1px solid #382c20;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.crowd-favor-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #9c6b21, #e6a832, #ffd166);
+    transition: width 0.14s ease-out;
+}
+
+.crowd-favor-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff8eb;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+    font-variant-numeric: tabular-nums;
+}

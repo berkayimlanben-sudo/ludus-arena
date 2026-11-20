@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ludus Arena — Gladyatör Yönetimi (v0.9.7)</title>
+    <title>Ludus Arena — Gladyatör Yönetimi (v0.9.8)</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="game-wrapper">
         <header class="top-bar">
-            <div class="brand">⚔️ LUDUS ARENA <span class="badge">v0.9.7 Yoldaşlık & Bahis</span></div>
+            <div class="brand">⚔️ LUDUS ARENA <span class="badge">v0.9.8 Seyirci & Pollice Verso</span></div>
 
             <div class="resource-bar">
                 <span id="ui-day" class="res-pill">Gün 1</span>
@@ -181,6 +181,17 @@
                     </div>
                 </section>
 
+                <div id="crowd-hud-bar" class="crowd-hud-bar">
+                    <div class="crowd-hud-top">
+                        <span id="crowd-tier-label" class="crowd-tier-label">📣 Seyirci Coşkusu: 😐 Sessiz Tribün</span>
+                        <span id="crowd-mercy-label" class="crowd-mercy-label hidden">👍 Kurtuluş Şansı: %0</span>
+                    </div>
+                    <div class="crowd-meter-wrap">
+                        <div id="crowd-favor-fill" class="crowd-favor-fill" style="width:15%"></div>
+                        <span id="crowd-favor-text" class="crowd-favor-text">15 / 100</span>
+                    </div>
+                </div>
+
                 <main class="arena-container">
                     <canvas id="arena-canvas" width="960" height="460"></canvas>
                     <div id="winner-banner" class="winner-banner hidden">
@@ -259,6 +270,7 @@
 
     <!-- Oyun & Yönetim -->
     <script src="game/CombatRules.js"></script>
+    <script src="game/CrowdRules.js"></script>
     <script src="game/Gladiator.js"></script>
     <script src="game/ArenaScene.js"></script>
     <script src="game/LudusScene.js"></script>

@@ -92,6 +92,35 @@
             ctx.fillStyle = regionId === 'imperial' ? '#9e7c2e' : '#42362f';
             ctx.fillRect(-160, 287, 1280, 5);
 
+            // İmparator Locası & Coşku Parıltısı (Ölümüne maçlarda veya coşkulu tribünde belirgin)
+            const favor = scene.crowdFavor || 0;
+            if (scene.isLethal || favor >= 60 || regionId === 'imperial' || regionId === 'colosseum') {
+                ctx.fillStyle = '#381316';
+                ctx.fillRect(432, 138, 96, 26);
+                ctx.fillStyle = '#d4af37';
+                ctx.fillRect(430, 136, 100, 4);
+                ctx.fillRect(430, 162, 100, 3);
+                // Locadaki İmparator/Senatör silueti
+                ctx.fillStyle = '#140b0c';
+                ctx.beginPath();
+                ctx.arc(480, 148, 6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillRect(472, 154, 16, 10);
+                // Altın taç çizgisi
+                ctx.fillStyle = '#ffd166';
+                ctx.fillRect(475, 141, 10, 2);
+            }
+            if (favor >= 60) {
+                ctx.save();
+                ctx.fillStyle = favor >= 85 ? 'rgba(255, 209, 102, 0.55)' : 'rgba(255, 209, 102, 0.30)';
+                for (let c = 0; c < 12; c++) {
+                    const cx = ((c * 87 + Math.floor(t * 14)) % 920) + 20;
+                    const cy = 225 + Math.sin(t * 2 + c) * 18;
+                    ctx.fillRect(cx, cy, 3, 3);
+                }
+                ctx.restore();
+            }
+
             // 3. Koyu, Tozlu ve Kan İzli Kum Zemin
             const sandGrad = ctx.createLinearGradient(0, 325, 0, 560);
             sandGrad.addColorStop(0, pal.sandTop);

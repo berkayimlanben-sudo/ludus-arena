@@ -136,6 +136,12 @@
     const returnLudusBtn = document.getElementById('return-ludus-btn');
     const battleLogEl = document.getElementById('battle-log');
 
+    const crowdHudBar = document.getElementById('crowd-hud-bar');
+    const crowdTierLabel = document.getElementById('crowd-tier-label');
+    const crowdMercyLabel = document.getElementById('crowd-mercy-label');
+    const crowdFavorFill = document.getElementById('crowd-favor-fill');
+    const crowdFavorText = document.getElementById('crowd-favor-text');
+
     const tacticBtns = {
         AGGRESSIVE: document.getElementById('tactic-aggressive'),
         DEFENSIVE: document.getElementById('tactic-defensive'),
@@ -1431,8 +1437,38 @@
                 : [Object.assign(toGladiatorConfig(opp, Boolean(opp.isBoss)), { sabotaged: isEnemySabotaged })];
 
             const matchRegionId = opp.isTournament ? 'imperial' : ludus.getCurrentRegion().id;
-            currentArena = new Game.ArenaScene(leftConfigs, rightConfigs, { regionId: matchRegionId });
+            const matchIsLethal = Boolean(opp.lethal);
+            currentArena = new Game.ArenaScene(leftConfigs, rightConfigs, {
+                regionId: matchRegionId,
+                isLethal: matchIsLethal
+            });
             currentArena.onBattleLog.connect(addLog);
+
+            const updateCrowdHud = () => {
+                if (!crowdHudBar || !currentArena || !Game.CrowdRules) return;
+                const favorVal = Game.CrowdRules.clampFavor(currentArena.crowdFavor);
+                const tier = Game.CrowdRules.getCrowdTier(favorVal);
+                crowdHudBar.className = `crowd-hud-bar ${tier.id}`;
+                if (crowdTierLabel) {
+                    const tipHint = tier.tipMult > 0 ? ` (+%${Math.round(tier.tipMult * 100)} Bahşiş)` : '';
+                    crowdTierLabel.textContent = `📣 Seyirci Coşkusu: ${tier.label}${tipHint}`;
+                }
+                if (crowdFavorFill) crowdFavorFill.style.width = `${favorVal}%`;
+                if (crowdFavorText) crowdFavorText.textContent = `${favorVal} / 100`;
+
+                if (crowdMercyLabel) {
+                    if (matchIsLethal && !isBribeThrow) {
+                        const hasFavTrait = myGlads.some(fg => fg.traitId === 'crowd_favorite');
+                        const tulliusRep = (ludus.state.senate && ludus.state.senate.reputations && ludus.state.senate.reputations.tullius) || 0;
+                        const mercyChance = Game.CrowdRules.calculateMercyChance(favorVal, hasFavTrait, tulliusRep);
+                        crowdMercyLabel.classList.remove('hidden');
+                        crowdMercyLabel.textContent = `👍 Pollice Verso Kurtuluş Şansı: %${Math.round(mercyChance * 100)}`;
+                    } else {
+                        crowdMercyLabel.classList.add('hidden');
+                    }
+                }
+            };
+            updateCrowdHud();
 
             pendingReturnTab = 'ludus';
             pendingChampionCeremony = null;
@@ -1441,23 +1477,26 @@
             currentArena.onMatchFinished.connect((_, teamSide) => {
                 const didWin = teamSide === 'left';
                 const remHps = currentArena.leftTeam.map(f => f.hp);
+                const matchCrowdFavor = currentArena.getMatchCrowdFavor ? currentArena.getMatchCrowdFavor() : Math.round(currentArena.crowdFavor || 0);
 
                 if (opp.isTournament) {
                     const res = ludus.recordTournamentMatchResult(selectedIds[0], opp, didWin, remHps[0], {
                         durationSec: currentArena.matchTime,
-                        activeBet
+                        activeBet,
+                        crowdFavor: matchCrowdFavor
                     });
                     renderTopStats();
                     const betNote = res.betResult ? ` • ${res.betResult.summary}` : '';
+                    const sparsioNote = (res.sparsioResult && res.sparsioResult.triggered) ? ` • ${res.sparsioResult.summary}` : '';
 
                     if (res.wonChampionship) {
                         const lvlMsg = res.leveledNames.length > 0 ? ` 🌟 SEVİYE ATLADI: ${res.leveledNames.join(', ')}!` : '';
-                        winnerText.textContent = `👑 İMPARATORLUK ŞAMPİYONU! +${res.goldEarned} Altın, +${res.fameEarned} Şöhret (+${res.xpReward} XP)${lvlMsg}${betNote}`;
+                        winnerText.textContent = `👑 İMPARATORLUK ŞAMPİYONU! +${res.goldEarned} Altın, +${res.fameEarned} Şöhret (+${res.xpReward} XP)${lvlMsg}${sparsioNote}${betNote}`;
                         pendingChampionCeremony = { fighterId: selectedIds[0], res };
                         returnLudusBtn.textContent = '👑 Taç Törenini Gör!';
                     } else if (didWin && res.nextRound) {
                         const healNote = res.breatherHeal > 0 ? ` • 💚 +${res.breatherHeal} Soluklanma Canı` : '';
-                        winnerText.textContent = `🏆 TUR ${opp.tournamentRound}/3 KAZANILDI! +${res.goldEarned} Altın (+${res.xpReward} XP)${healNote}${betNote}`;
+                        winnerText.textContent = `🏆 TUR ${opp.tournamentRound}/3 KAZANILDI! +${res.goldEarned} Altın (+${res.xpReward} XP)${healNote}${sparsioNote}${betNote}`;
                         pendingReturnTab = 'arena';
                         returnLudusBtn.textContent = `⚔️ Arena'ya Dön (Tur ${res.nextRound}/3)`;
                     } else {
@@ -1471,7 +1510,8 @@
                 const res = ludus.recordTeamMatchResult(selectedIds, opp.id, didWin, remHps, {
                     durationSec: currentArena.matchTime,
                     consumablesUsed: usedConsumables.map(c => (c ? c.id : null)),
-                    activeBet
+                    activeBet,
+                    crowdFavor: matchCrowdFavor
                 });
                 renderTopStats();
 
@@ -1480,6 +1520,7 @@
                     : '';
                 const bribeNote = res.bribeResult ? ` • ${res.bribeResult.summary}` : '';
                 const betNote = res.betResult ? ` • ${res.betResult.summary}` : '';
+                const sparsioNote = (res.sparsioResult && res.sparsioResult.triggered) ? ` • ${res.sparsioResult.summary}` : '';
                 const relNote = res.relationUpdate
                     ? ` • 🤝 Takım İlişkisi +${res.relationUpdate.delta}${res.relationUpdate.promotedTier ? ` (${res.relationUpdate.promotedTier.badge}!)` : ''}`
                     : '';
@@ -1491,10 +1532,16 @@
                 if (didWin) {
                     const lvlMsg = res.leveledNames.length > 0 ? ` 🌟 SEVİYE ATLADI: ${res.leveledNames.join(', ')}!` : '';
                     const promoMsg = res.promotedRegion ? ` • 🗺️ YENİ BÖLGE: ${res.promotedRegion.icon} ${res.promotedRegion.name}!` : '';
-                    winnerText.textContent = `🏆 ZAFER! +${res.goldEarned} Altın, +${res.fameEarned} Şöhret (+${res.xpReward} XP)${lvlMsg}${promoMsg}${contractNote}${bribeNote}${betNote}${relNote}${reqNote}`;
+                    winnerText.textContent = `🏆 ZAFER! +${res.goldEarned} Altın, +${res.fameEarned} Şöhret (+${res.xpReward} XP)${lvlMsg}${promoMsg}${sparsioNote}${contractNote}${bribeNote}${betNote}${relNote}${reqNote}`;
+                } else if (res.sparedNames && res.sparedNames.length > 0 && res.deadNames.length === 0) {
+                    const injTxt = res.injuries.length > 0 ? ` • 🩹 ${res.injuries[0]}` : '';
+                    winnerText.textContent = `👍 MISSIO! İmparator başparmağını YUKARI kaldırdı — ${res.sparedNames.join(', ')} bağışlandı (1 Can, +15 Sadakat)! (+${res.goldEarned} Altın, +${res.xpReward} XP${injTxt})${bribeNote}${betNote}${relNote}`;
                 } else if (res.deadNames.length > 0) {
                     const rookieMsg = res.rescuedByRookie ? ' (Sokaktan yeni bir çaylak katıldı!)' : '';
-                    winnerText.textContent = `⚰️ ${res.deadNames.join(', ')} ARENADA CAN VERDİ!${rookieMsg}${bribeNote}${betNote}`;
+                    const sparedMsg = (res.sparedNames && res.sparedNames.length > 0) ? ` • 👍 ${res.sparedNames.join(', ')} İmparator tarafından bağışlandı!` : '';
+                    const downPollice = (res.polliceResults && res.polliceResults.find(p => p.eligible && !p.spared));
+                    const polliceMsg = downPollice ? ` (${downPollice.summary})` : '';
+                    winnerText.textContent = `⚰️ ${res.deadNames.join(', ')} ARENADA CAN VERDİ!${polliceMsg}${sparedMsg}${rookieMsg}${bribeNote}${betNote}`;
                 } else if (res.bribeResult && res.bribeResult.keptDeal && res.bribeResult.type === 'throw_match') {
                     winnerText.textContent = `🎭 ŞİKE MAÇI BİTTİ! ${res.bribeResult.summary} (+${res.xpReward} XP)${betNote}`;
                 } else {
@@ -1533,7 +1580,7 @@
             openConfirmModal({
                 kicker: '💀 ÖLÜMÜNE ARENA MAÇI',
                 title: `${opp.name} ile Ölümüne Düello`,
-                desc: `⚠️ DİKKAT: ${names} bu maçta yenilirse KALICI OLARAK ÖLECEK. Yine de arenaya çıksın mı?`,
+                desc: `⚠️ DİKKAT: ${names} bu maçta yenilirse KALICI OLARAK ÖLECEK (Yüksek seyirci coşkusu İmparatorun Pollice Verso merhametini getirebilir). Yine de arenaya çıksın mı?`,
                 confirmLabel: '💀 Evet, Ölümüne Çık!',
                 cancelLabel: '🛡️ Vazgeç',
                 onConfirm: launchMatch
@@ -1622,6 +1669,24 @@
                 btn.textContent = labels[k];
             }
         });
+
+        if (crowdHudBar && Game.CrowdRules) {
+            const favorVal = Game.CrowdRules.clampFavor(currentArena.crowdFavor);
+            const tier = Game.CrowdRules.getCrowdTier(favorVal);
+            crowdHudBar.className = `crowd-hud-bar ${tier.id}`;
+            if (crowdTierLabel) {
+                const tipHint = tier.tipMult > 0 ? ` (+%${Math.round(tier.tipMult * 100)} Bahşiş)` : '';
+                crowdTierLabel.textContent = `📣 Seyirci Coşkusu: ${tier.label}${tipHint}`;
+            }
+            if (crowdFavorFill) crowdFavorFill.style.width = `${favorVal}%`;
+            if (crowdFavorText) crowdFavorText.textContent = `${favorVal} / 100`;
+            if (crowdMercyLabel && !crowdMercyLabel.classList.contains('hidden')) {
+                const hasFavTrait = currentArena.leftTeam.some(f => f && f.trait && f.trait.id === 'crowd_favorite');
+                const tulliusRep = (ludus.state.senate && ludus.state.senate.reputations && ludus.state.senate.reputations.tullius) || 0;
+                const mercyChance = Game.CrowdRules.calculateMercyChance(favorVal, hasFavTrait, tulliusRep);
+                crowdMercyLabel.textContent = `👍 Pollice Verso Kurtuluş Şansı: %${Math.round(mercyChance * 100)}`;
+            }
+        }
     });
 
     function renderEventModal() {

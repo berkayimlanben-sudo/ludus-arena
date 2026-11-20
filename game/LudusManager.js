@@ -71,6 +71,7 @@
                 lastEventId: null,
                 pendingEvent: null,
                 bettingStats: { totalWagered: 0, totalWon: 0, betsWon: 0, betsLost: 0 },
+                crowdStats: { totalSparsioGold: 0, polliceMercies: 0 },
                 marketRecruits: [],
                 dailyOpponents: []
             };
@@ -133,6 +134,9 @@
             if (this.state.pendingEvent === undefined) this.state.pendingEvent = null;
             if (!this.state.bettingStats) {
                 this.state.bettingStats = { totalWagered: 0, totalWon: 0, betsWon: 0, betsLost: 0 };
+            }
+            if (!this.state.crowdStats) {
+                this.state.crowdStats = { totalSparsioGold: 0, polliceMercies: 0 };
             }
 
             const ensureGlad = (obj) => {
@@ -1414,9 +1418,13 @@
             const bribeAccepted = Boolean(opp && opp.bribeOffer && opp.bribeOffer.accepted);
             const isIntentionalThrow = bribeAccepted && opp.bribeOffer.type === 'throw_match' && !didWin;
 
+            const crowdFavor = matchMeta.crowdFavor !== undefined ? matchMeta.crowdFavor : 0;
             let goldEarned = 0;
             let fameEarned = 0;
+            let sparsioResult = null;
             const deadNames = [];
+            const sparedNames = [];
+            const polliceResults = [];
             const leveledNames = [];
             const injuries = [];
             const fulfilledRequests = [];
@@ -1442,6 +1450,15 @@
                     });
                     const rawFame = hasFav ? Math.round(opp.rewardFame * 1.3) : opp.rewardFame;
                     fameEarned = Math.max(1, Math.round(rawFame * (1 + (senateBonuses.fameBonusMult || 0))));
+                    if (Game.CrowdRules) {
+                        sparsioResult = Game.CrowdRules.computeSparsioReward(crowdFavor, opp.rewardGold, hasFav);
+                        if (sparsioResult && sparsioResult.triggered) {
+                            goldEarned += sparsioResult.bonusGold;
+                            fameEarned += sparsioResult.bonusFame;
+                            if (!this.state.crowdStats) this.state.crowdStats = { totalSparsioGold: 0, polliceMercies: 0 };
+                            this.state.crowdStats.totalSparsioGold += sparsioResult.bonusGold;
+                        }
+                    }
                 } else {
                     goldEarned = isIntentionalThrow ? 0 : Math.round(opp.rewardGold * 0.15);
                 }
@@ -1482,8 +1499,38 @@
                     }
                     if (this.grantXp(g, xpReward) && !leveledNames.includes(g.name)) leveledNames.push(g.name);
                 } else if (opp && opp.lethal) {
-                    deadNames.push(g.name);
-                    this.state.roster.splice(gIdx, 1);
+                    let polliceRes = null;
+                    if (Game.CrowdRules) {
+                        const tulliusRep = (this.state.senate && this.state.senate.reputations && this.state.senate.reputations.tullius) || 0;
+                        polliceRes = Game.CrowdRules.evaluatePolliceVerso({
+                            isLethal: true,
+                            favor: crowdFavor,
+                            isCrowdFavorite: g.traitId === 'crowd_favorite',
+                            tulliusRep,
+                            isBribeThrow: isIntentionalThrow
+                        }, matchMeta.polliceRollFn || Math.random);
+                        polliceResults.push(Object.assign({ name: g.name }, polliceRes));
+                    }
+
+                    if (polliceRes && polliceRes.spared) {
+                        sparedNames.push(g.name);
+                        if (!this.state.crowdStats) this.state.crowdStats = { totalSparsioGold: 0, polliceMercies: 0 };
+                        this.state.crowdStats.polliceMercies += 1;
+                        g.losses += 1;
+                        g.fatigue = (g.fatigue || 0) + 1;
+                        g.currentHp = 1;
+                        if (Math.random() < 0.85) {
+                            g.injuryId = pickRandomKey(Data.INJURIES);
+                            injuries.push(`${g.name}: ${Data.INJURIES[g.injuryId].name}`);
+                        }
+                        if (Game.BondingRules) {
+                            g.loyalty = Game.BondingRules.clampLoyalty((g.loyalty ?? 65) + 15);
+                        }
+                        if (this.grantXp(g, xpReward) && !leveledNames.includes(g.name)) leveledNames.push(g.name);
+                    } else {
+                        deadNames.push(g.name);
+                        this.state.roster.splice(gIdx, 1);
+                    }
                 } else {
                     g.losses += 1;
                     g.fatigue = (g.fatigue || 0) + 1;
@@ -1584,6 +1631,9 @@
                 fameEarned,
                 xpReward,
                 deadNames,
+                sparedNames,
+                polliceResults,
+                sparsioResult,
                 leveledNames,
                 injuries,
                 fulfilledRequests,
@@ -1625,9 +1675,20 @@
 
         recordTournamentMatchResult(gladiatorId, opp, didWin, remainingHp, matchMeta = {}) {
             const g = this.state.roster.find(x => x.id === gladiatorId);
-            const goldEarned = didWin ? opp.rewardGold : Math.round(opp.rewardGold * 0.25);
+            const crowdFavor = matchMeta.crowdFavor !== undefined ? matchMeta.crowdFavor : 0;
+            let goldEarned = didWin ? opp.rewardGold : Math.round(opp.rewardGold * 0.25);
             const hasFav = g && g.traitId === 'crowd_favorite';
-            const fameEarned = didWin ? (hasFav ? Math.round(opp.rewardFame * 1.3) : opp.rewardFame) : 5;
+            let fameEarned = didWin ? (hasFav ? Math.round(opp.rewardFame * 1.3) : opp.rewardFame) : 5;
+            let sparsioResult = null;
+            if (didWin && Game.CrowdRules) {
+                sparsioResult = Game.CrowdRules.computeSparsioReward(crowdFavor, opp.rewardGold, hasFav);
+                if (sparsioResult && sparsioResult.triggered) {
+                    goldEarned += sparsioResult.bonusGold;
+                    fameEarned += sparsioResult.bonusFame;
+                    if (!this.state.crowdStats) this.state.crowdStats = { totalSparsioGold: 0, polliceMercies: 0 };
+                    this.state.crowdStats.totalSparsioGold += sparsioResult.bonusGold;
+                }
+            }
             const xpReward = didWin ? (85 + (opp.tournamentRound || 1) * 35) : 35;
             const leveledNames = [];
             const injuries = [];
@@ -1693,6 +1754,7 @@
                 goldEarned: goldEarned + championshipBonusGold,
                 fameEarned: fameEarned + championshipBonusFame,
                 xpReward,
+                sparsioResult,
                 leveledNames,
                 injuries,
                 breatherHeal,
@@ -1770,6 +1832,7 @@
                 lastEventId: null,
                 pendingEvent: null,
                 bettingStats: this.state.bettingStats || { totalWagered: 0, totalWon: 0, betsWon: 0, betsLost: 0 },
+                crowdStats: this.state.crowdStats || { totalSparsioGold: 0, polliceMercies: 0 },
                 marketRecruits: [],
                 dailyOpponents: []
             };

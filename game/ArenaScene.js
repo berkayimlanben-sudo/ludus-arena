@@ -5,6 +5,7 @@
             this.leftConfig = leftConfig;
             this.rightConfig = rightConfig;
             this.regionId = options.regionId || 'capua';
+            this.isLethal = Boolean(options.isLethal);
 
             this.camera = new Engine.Camera2D('ArenaCam', 480, 240);
             this.particles = new Game.ParticleSystem();
@@ -25,8 +26,41 @@
             this.onBattleLog = new Engine.Signal();
             this.onMatchFinished = new Engine.Signal();
 
-            this.crowdExcitement = 0;
+            const leftListInit = Array.isArray(leftConfig) ? leftConfig : [leftConfig];
+            this.crowdFavor = Game.CrowdRules ? Game.CrowdRules.getInitialFavor(leftListInit) : 15;
+            this.peakCrowdFavor = this.crowdFavor;
+            this._announcedCrowdTiers = new Set();
+            this.crowdExcitement = this.crowdFavor / 100;
             this.crowdTime = 0;
+        }
+
+        _boostCrowdFavor(delta) {
+            if (!delta || delta <= 0) return;
+            const prevTier = Game.CrowdRules ? Game.CrowdRules.getCrowdTier(this.crowdFavor) : null;
+            this.crowdFavor = Game.CrowdRules
+                ? Game.CrowdRules.clampFavor(this.crowdFavor + delta)
+                : Math.min(100, Math.max(0, this.crowdFavor + delta));
+            if (this.crowdFavor > this.peakCrowdFavor) {
+                this.peakCrowdFavor = this.crowdFavor;
+            }
+            this.crowdExcitement = Math.max(this.crowdExcitement, this.crowdFavor / 100);
+
+            if (Game.CrowdRules) {
+                const nextTier = Game.CrowdRules.getCrowdTier(this.crowdFavor);
+                if (prevTier && nextTier.id !== prevTier.id && !this._announcedCrowdTiers.has(nextTier.id)) {
+                    if (nextTier.id === 'roaring') {
+                        this._announcedCrowdTiers.add('roaring');
+                        this.onBattleLog.emit('🔥 SEYİRCİ COŞTU! Tribünler tezahüratla inliyor (Bahşiş & Merhamet şansı arttı)!');
+                    } else if (nextTier.id === 'frenzied') {
+                        this._announcedCrowdTiers.add('frenzied');
+                        this.onBattleLog.emit('👑 KİTLE ÇILDIRDI! Kalabalık altın yağdırmaya ve merhamet dilemeye hazır!');
+                    }
+                }
+            }
+        }
+
+        getMatchCrowdFavor() {
+            return Math.round(Math.max(this.crowdFavor, this.peakCrowdFavor * 0.85));
         }
 
         _ready() {
@@ -72,8 +106,13 @@
                 f.allies = this.leftTeam.filter(a => a !== f);
                 f.allFighters = this.allFighters;
                 f.onLog.connect((msg) => {
-                    this.crowdExcitement = Math.min(1, this.crowdExcitement + 0.35);
+                    this.crowdExcitement = Math.min(1, Math.max(this.crowdExcitement + 0.12, this.crowdFavor / 100));
                     this.onBattleLog.emit(msg);
+                });
+                f.onCombatEvent.connect((evtType, actor, target) => {
+                    if (Game.CrowdRules) {
+                        this._boostCrowdFavor(Game.CrowdRules.getFavorDeltaForEvent(evtType, actor, target));
+                    }
                 });
                 f.onDied.connect(() => this._checkMatchEnd());
                 this.addChild(f);
@@ -84,8 +123,13 @@
                 f.allies = this.rightTeam.filter(a => a !== f);
                 f.allFighters = this.allFighters;
                 f.onLog.connect((msg) => {
-                    this.crowdExcitement = Math.min(1, this.crowdExcitement + 0.35);
+                    this.crowdExcitement = Math.min(1, Math.max(this.crowdExcitement + 0.12, this.crowdFavor / 100));
                     this.onBattleLog.emit(msg);
+                });
+                f.onCombatEvent.connect((evtType, actor, target) => {
+                    if (Game.CrowdRules) {
+                        this._boostCrowdFavor(Game.CrowdRules.getFavorDeltaForEvent(evtType, actor, target));
+                    }
                 });
                 f.onDied.connect(() => this._checkMatchEnd());
                 this.addChild(f);
@@ -134,6 +178,9 @@
             if (this.tacticCooldowns[type] > 0) return false;
 
             aliveLeft.forEach(f => f.applyTactic(type));
+            if (Game.CrowdRules) {
+                this._boostCrowdFavor(Game.CrowdRules.getFavorDeltaForEvent(`tactic_${type}`, aliveLeft[0], null));
+            }
             if (type === 'MORALE') {
                 this.crowdExcitement = 1.0;
                 this.tacticCooldowns.MORALE = 13;
@@ -156,6 +203,9 @@
         _process(delta) {
             if (!this.matchEnded) {
                 this.matchTime += delta;
+                if (this.crowdFavor > 10) {
+                    this.crowdFavor = Math.max(10, this.crowdFavor - delta * 1.4);
+                }
                 Object.keys(this.tacticCooldowns).forEach(k => {
                     if (this.tacticCooldowns[k] > 0) {
                         this.tacticCooldowns[k] = Math.max(0, this.tacticCooldowns[k] - delta);
@@ -164,7 +214,7 @@
             }
 
             this.crowdTime += delta * (3 + this.crowdExcitement * 10);
-            this.crowdExcitement = Math.max(0, this.crowdExcitement - delta * 0.45);
+            this.crowdExcitement = Math.max(this.crowdFavor / 100, this.crowdExcitement - delta * 0.35);
 
             const active = this.allFighters.filter(f => f.hp > 0);
             const tracked = active.length >= 2 ? active : this.allFighters;

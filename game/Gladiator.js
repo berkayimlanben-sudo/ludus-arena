@@ -114,6 +114,7 @@
 
             this.onDied = new Engine.Signal();
             this.onLog = new Engine.Signal();
+            this.onCombatEvent = new Engine.Signal();
 
             this.walkPhase = 0;
             this.attackCooldown = 0;
@@ -483,6 +484,7 @@
                     if (this.tree.activeCamera) this.tree.activeCamera.shake(4.5);
                 }
                 this.onLog.emit(`${target.gladiatorName}, ${this.gladiatorName}'ın darbesini kalkanıyla savuşturdu!`);
+                this.onCombatEvent.emit('block', target, this, blockedDmg);
 
                 if (target.hp > 0 && target.shield.effect && target.shield.effect.type === 'thorns') {
                     const thornsDmg = target.shield.effect.dmg;
@@ -570,6 +572,7 @@
                     ? `${this.gladiatorName} KRİTİK darbe indirdi: ${finalDmg} hasar!`
                     : `${this.gladiatorName}, ${target.gladiatorName}'a ${finalDmg} hasar vurdu.`
             );
+            this.onCombatEvent.emit(isCrit ? 'crit' : 'hit', this, target, finalDmg);
 
             let stunnedNow = false;
             if (target.hp > 0 && effectApplied) {
@@ -631,6 +634,7 @@
             this.fsm.transitionTo('DEAD');
             if (this.particles) this.particles.spawnDust(this.x, this.y, 10);
             this.onLog.emit(`⚔️ ${killer.gladiatorName}, ${this.gladiatorName}'ı yere serdi!`);
+            this.onCombatEvent.emit('ko', killer, this, 0);
             this.onDied.emit(this, killer);
         }
 
